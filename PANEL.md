@@ -21,7 +21,7 @@ See [UPSTREAM-AUDIT.md](UPSTREAM-AUDIT.md) for the current core issue and PR inv
 
 At the time this branch was created, upstream had approximately:
 
-- 5,072 open issues;
+- 5,089 open issues;
 - 16 open pull requests;
 - active commits on `main`.
 

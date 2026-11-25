@@ -102,6 +102,8 @@ function server(lang, posts, broken) {
     if (url.pathname === "/api/plugins") return json({ bun: true, bunVersion: "1.4.2", plugins: [], picker: false, movable: [] });
     if (url.pathname === "/api/plugins/listings") return json({ listings: [] });
     if (url.pathname === "/api/plugins/github") return json({ repos: [] });
+    if (url.pathname === "/api/library") return json({ dir: "/Users/me/.magpie/library", backups: "/Users/me/.magpie/backups", home: "/Users/me", agents: [], instructions: { agents: [], sets: [] }, servers: [], foundServers: [], projects: [], foundSkills: [], skills: [], problems: [], hooks: [] });
+    if (url.pathname === "/api/artifacts") return json({ artifacts: [] });
     if (url.pathname === "/api/usage/quotas") return json([]);
     if (url.pathname === "/api/groups") return json({ groups: [], models: [] });
     if (url.pathname === "/api/window/fit") return route.fulfill({ status: 204 });
@@ -121,6 +123,12 @@ const viewShown = (page) => page.evaluate(() => [...document.querySelectorAll("m
 // points; under it Routing's page opens them)
 const KEPT = ["agents", "providers", "routing", "gateway", "usage", "masking", "plugins"];
 const keptAt = (width) => (width >= 1024 ? KEPT.flatMap((k) => (k === "routing" ? [k, "groups"] : [k])) : KEPT);
+const libraryTabs = (width, gone = []) => [
+  "agents",
+  "library",
+  ...(width >= 1024 ? ["artifacts"] : []),
+  ...keptAt(width).slice(1).filter((k) => !gone.includes(k)),
+];
 const rowsOf = (page) => page.evaluate(() => [...document.querySelectorAll("#builtinList .feat-row")].map((r) => {
   const b = r.querySelector('[role="switch"]');
   return { id: r.dataset.id, name: r.querySelector(".name").textContent, on: b.getAttribute("aria-checked"), disabled: b.disabled, why: r.querySelector(".feat-why")?.textContent || "" };
@@ -221,8 +229,19 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         await page.locator('#builtinList [data-id="library"] [role="switch"]').click();
         await page.waitForSelector('#builtinList [data-id="library"] [aria-checked="true"]');
         assert.deepEqual(posts, [["library", true]], where);
-        if (width >= 800) assert.deepEqual(await tabs(page), ["agents", "library", "artifacts", ...keptAt(width).slice(1)], `${where}: Library back`);
+        assert.deepEqual(await tabs(page), libraryTabs(width), `${where}: Library back`);
         assert.deepEqual(await viewShown(page), ["view-plugins"], `${where}: Plugins stays`);
+        if (width < 1024) {
+          // Artifacts has no header tab in the narrow layout; Library's head is its way in.
+          await page.evaluate(() => show("library"));
+          const into = page.locator("#view-library .lib-head .lib-toart");
+          await into.waitFor();
+          assert.ok(await into.isVisible(), `${where}: Library's head opens Artifacts`);
+          await into.click({ force: true });
+          assert.deepEqual(await viewShown(page), ["view-artifacts"], `${where}: Artifacts from Library's head`);
+          await page.evaluate(() => show("plugins"));
+          await page.locator("#view-plugins").waitFor();
+        }
         // Observability's, Routing's and Usage's rows can be below the fold:
         // the reader scrolls to them with the wheel, since the page puts back
         // a scroll that isn't the reader's (scrollOnPurpose), a click's own
@@ -271,7 +290,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         await page.locator('#builtinList [data-id="routing"] [role="switch"]').click();
         await page.waitForSelector('#builtinList [data-id="routing"] [aria-checked="false"]');
         assert.deepEqual(posts.at(-1), ["routing", false], where);
-        if (width >= 800) assert.deepEqual(await tabs(page), ["agents", "library", "artifacts", ...keptAt(width).slice(1).filter((k) => k !== "routing" && k !== "groups")], `${where}: Routing gone`);
+        assert.deepEqual(await tabs(page), libraryTabs(width, ["routing", "groups"]), `${where}: Routing gone`);
         assert.deepEqual(await viewShown(page), ["view-plugins"], `${where}: Plugins stays`);
         // and Usage: its tab goes
         const usageSwitch = page.locator('#builtinList [data-id="usage"] [role="switch"]');
@@ -280,7 +299,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         await usageSwitch.click();
         await page.waitForSelector('#builtinList [data-id="usage"] [aria-checked="false"]');
         assert.deepEqual(posts.at(-1), ["usage", false], where);
-        if (width >= 800) assert.deepEqual(await tabs(page), ["agents", "library", "artifacts", ...keptAt(width).slice(1).filter((k) => k !== "routing" && k !== "groups" && k !== "usage")], `${where}: Usage gone`);
+        assert.deepEqual(await tabs(page), libraryTabs(width, ["routing", "groups", "usage"]), `${where}: Usage gone`);
         assert.deepEqual(await viewShown(page), ["view-plugins"], `${where}: Plugins stays`);
         // Discover brings the search back
         await pluginTabs(page, side).nth(1).click();

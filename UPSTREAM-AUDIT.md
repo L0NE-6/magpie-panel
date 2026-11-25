@@ -33,6 +33,7 @@ the shared session listing and transcript switches.
 | [#7750](https://github.com/yetone/magpie/issues/7750) | Integrated in panel as `4b8b4d1a` | Obsidian config and vault probes are bounded to one second; a stalled path is treated as no Copilot and remembered once per process. Obsidian tests, the focused race test and vet pass. A real macOS File Provider stall remains unverified. |
 | [#7747](https://github.com/yetone/magpie/issues/7747) | Integrated in panel as `cb29c57f` | Each Claude run gets a unique ID and an optional `MAGPIE_CLAUDE_KILL` hook runs after the host tree ends, covering Docker/SSH/WSL exec boundaries. Abort waits for both cleanup paths. Focused gateway/TUI tests, race, native/Linux vet and Linux test compilation pass; no real Docker or WSL runtime was available. |
 | [#7749](https://github.com/yetone/magpie/issues/7749) | Integrated in panel as `a117be61` | A bare `~/.claude-* /settings.json` no longer makes a Claude Code profile unless it contains a key Claude Code or magpie writes. claude-mem is no longer listed or ticked, while credentials, projects and magpie's isolated Desktop Code tab still count. Focused tests and race pass. |
+| [#7707](https://github.com/yetone/magpie/issues/7707) | Integrated in panel as `20539962` | Plain-text Anthropic cyber/content policy refusals from a 400, 502 or streamed `api_error` are classified as refusals, fail over to another provider/model and do not rest the account. Unrelated 400/502 messages keep their old behavior. Refusal-family tests, race and vet pass. |
 
 ## High-Risk Open Issues
 

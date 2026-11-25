@@ -298,6 +298,7 @@ func shapeTail(s string) int {
 	for f, kind := range shapes {
 		i := strings.LastIndex(s, f)
 		if foldStandIn(kind) {
+			i = strings.LastIndex(lower, f)
 			// a stand-in whole only as a name: one that came whole is
 			// put back and its end held from, but eight letters inside
 			// another made-up key are no stand-in that came, and

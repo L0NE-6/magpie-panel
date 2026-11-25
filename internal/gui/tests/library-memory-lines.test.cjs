@@ -84,11 +84,28 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         const row = page.locator(`${view} .lib-mems .lib-mem[data-id="a1"]`);
         await row.waitFor();
         const name = row.locator(".who .name");
+        // each height is read once the page shows the state it checks, not
+        // on the first frame the row shows in: beside the other memory
+        // files, under load, that frame can still carry an earlier layout
+        // (fonts or the row's styles arriving), and the folded name then
+        // measures over a line (#7735)
+        await page.evaluate(() => document.fonts.ready);
         const lineH = await name.evaluate((e) => parseFloat(getComputedStyle(e).lineHeight) || parseFloat(getComputedStyle(e).fontSize) * 1.3);
+        const sel = `${view} .lib-mems .lib-mem[data-id="a1"] .who .name`;
+        const reaches = async (lo, hi) => {
+          try {
+            await page.waitForFunction(([s, lo, hi]) => {
+              const e = document.querySelector(s);
+              const h = e && e.getBoundingClientRect().height;
+              return h >= lo && h < hi;
+            }, [sel, lo, hi]);
+          } catch {}
+          return name.evaluate((e) => e.getBoundingClientRect().height);
+        };
 
         // folded: the first line and an ellipsis, on one line
         assert.equal(await name.textContent(), "Release steps: …");
-        assert((await name.evaluate((e) => e.getBoundingClientRect().height)) < lineH * 1.5, "the folded row is more than a line");
+        assert((await reaches(0, lineH * 1.5)) < lineH * 1.5, "the folded row is more than a line");
         // a suggestion folds the same way
         assert.equal(await page.locator(`${view} .lib-memsugg [data-sugg="skill:a1"] .name`).textContent(), "Release steps: …");
 
@@ -98,7 +115,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         await ta.waitFor();
         assert.equal(await name.textContent(), STEPS);
         assert.equal(await name.evaluate((e) => getComputedStyle(e).whiteSpace), "pre-wrap");
-        assert((await name.evaluate((e) => e.getBoundingClientRect().height)) >= lineH * 3.5, "the open row ran its lines together");
+        assert((await reaches(lineH * 3.5, Infinity)) >= lineH * 3.5, "the open row ran its lines together");
         assert.equal(await ta.inputValue(), STEPS);
 
         // a line added in the editor is saved with its break

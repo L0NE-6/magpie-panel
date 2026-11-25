@@ -20,10 +20,10 @@ workflow, and verified local integrations.
 | [#1033](https://github.com/yetone/magpie/pull/1033) | Draft / conflicting | P2 Reasonix sessions; needs rebase, completeness tests, and a real binary check. |
 | [#1072](https://github.com/yetone/magpie/pull/1072) | Conflicting / dirty | P2 library hash behavior; preserve old-hash compatibility. |
 | [#1073](https://github.com/yetone/magpie/pull/1073) | Integrated in panel | Reimplemented against the current Settings API as `b2ed15e`; focused Go tests and race checks pass. |
-| [#1074](https://github.com/yetone/magpie/pull/1074) | Integrated in panel | Archive and OTLP masking are unified as `4ecf1ef`; focused Go tests and cross-platform vet pass. Real S3/collector verification remains pending. |
+| [#1074](https://github.com/yetone/magpie/pull/1074) | Integrated in panel | Archive and OTLP masking are unified as `4ecf1ef`; focused Go tests and cross-platform vet pass. The later panel merge dropped `Settings.Redaction`/`Scrubbing`, restored as `d1469ff0`. Real S3/collector verification remains pending. |
 | [#1157](https://github.com/yetone/magpie/pull/1157) | Conflicting / dirty | P2 CI decision: run the whole provider race suite. |
 | [#1181](https://github.com/yetone/magpie/pull/1181) | Conflicting / dirty | P2 routing key plan windows; adapt to the current `cardFor` refactor. |
-| [#1258](https://github.com/yetone/magpie/pull/1258) | Conflicting / dirty | P1 signal handling; needs Linux drain and ignored-SIGINT tests. |
+| [#1258](https://github.com/yetone/magpie/pull/1258) | Integrated in panel | SIGTERM and SIGINT now drain and return through `Web.Wait`; SIGHUP remains signal-terminated by design. Linux subprocess test passed in Actions run `45608299051` for SIGTERM, SIGINT, SIGHUP and page Quit. Integrated as `a8377782`. |
 | [#1331](https://github.com/yetone/magpie/pull/1331) | Integrated in panel | Loopback HTTPS, constrained certificate SANs, explicit GUI trust flow and allowlisted CORS are integrated as `532f91a`; real macOS/Windows Office trust chains remain unverified. |
 
 ## Maintenance Rules

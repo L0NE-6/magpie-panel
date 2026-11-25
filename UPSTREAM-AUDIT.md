@@ -19,6 +19,13 @@ The panel includes upstream `eab4b006` and the five commits before it:
 The Reasonix integration from `#1033` and CatPaw discovery are both retained in
 the shared session listing and transcript switches.
 
+## Integrated Open Issues
+
+| Issue | Current state | Verification |
+| :--- | :--- | :--- |
+| [#7733](https://github.com/yetone/magpie/issues/7733) | Integrated in panel as `88c7e73b` | A named `tool_choice` now keeps the client's complete tool list for the run while `allowedTools` still permits only the named tool for that turn. The focused gateway regression tests and `go vet ./internal/gateway` pass. |
+| [#7746](https://github.com/yetone/magpie/issues/7746) | Integrated in panel as `8ef1bd0e` | A gateway call with a matching `response_id` now pairs with its Codex session-file row even when another client, such as T3 Code, drove Codex. The focused usage regression test and `go vet -tags nogui ./internal/usage ./internal/gateway` pass. The full `internal/usage` package still has an unrelated Windows account-metadata failure. |
+
 ## Open Pull Requests
 
 | PR | Current state | Maintenance note |

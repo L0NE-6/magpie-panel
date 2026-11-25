@@ -4,6 +4,8 @@
 // works. {name} slots are filled by t(str, vars).
 const I18N = {
   zh: {
+    "HTTPS address": "HTTPS 地址",
+    "Trusted": "已信任",
     "disabled": "已停用",
     "Disabled in Settings › Models ({pattern}): refused on every route": "已在 设置 › 模型 中停用（{pattern}）：所有路由都会拒绝",
     "Check {model} on {provider}": "在 {provider} 上检查 {model}",
@@ -5622,6 +5624,8 @@ const I18N = {
     "taken out of this agent's model list": "已从这个 Agent 的模型列表中移除",
   },
   "zh-TW": {
+    "HTTPS address": "HTTPS 位址",
+    "Trusted": "已信任",
     "disabled": "已停用",
     "Disabled in Settings › Models ({pattern}): refused on every route": "已在 設定 › 模型 中停用（{pattern}）：所有路由都會拒絕",
     "Check {model} on {provider}": "在 {provider} 上檢查 {model}",
@@ -11224,6 +11228,8 @@ const I18N = {
     "taken out of this agent's model list": "已從這個 Agent 的模型列表中移除",
   },
   ja: {
+    "HTTPS address": "HTTPS アドレス",
+    "Trusted": "信頼済み",
     "disabled": "無効",
     "Disabled in Settings › Models ({pattern}): refused on every route": "設定 › モデル で無効にしています（{pattern}）：どの経路でも断られます",
     "Check {model} on {provider}": "{provider} で {model} をチェック",
@@ -16828,6 +16834,8 @@ const I18N = {
     "taken out of this agent's model list": "このエージェントのモデル一覧から外されています",
   },
   de: {
+    "HTTPS address": "HTTPS-Adresse",
+    "Trusted": "Vertraut",
     "disabled": "deaktiviert",
     "Disabled in Settings › Models ({pattern}): refused on every route": "In Einstellungen › Modelle deaktiviert ({pattern}): auf jedem Weg abgelehnt",
     "Check {model} on {provider}": "{model} bei {provider} prüfen",

@@ -2866,10 +2866,13 @@ func putBack(s *Skill) (bool, error) {
 			if runtime.GOOS == "windows" && !filepath.IsAbs(to) {
 				to = filepath.Join(filepath.Dir(e.Path), to)
 			}
-			dirLink(to, e.Path)
+			if err := dirLink(to, e.Path); err != nil {
+				return false, err
+			}
 		case dir != "":
 			if err := copyDir(dir, e.Path); err != nil {
 				os.RemoveAll(e.Path)
+				return false, err
 			}
 		}
 	}

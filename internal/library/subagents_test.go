@@ -43,6 +43,7 @@ func TestSubagentsEachAgentsFile(t *testing.T) {
 	h := sandbox(t)
 	files := subagentAgents(t, h)
 	ok(t)(SaveServer("", Server{Name: "github", Transport: "stdio", Command: "npx", Agents: []string{"claude", "droid"}}))
+	write(t, filepath.Join(skillDir("tdd"), "SKILL.md"), "---\nname: tdd\ndescription: Tests first\n---\n")
 	ok(t)(change(func(l *Library) error {
 		l.Skills = append(l.Skills, &Skill{Name: "tdd", Agents: []string{}})
 		return nil

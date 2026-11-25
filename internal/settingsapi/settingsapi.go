@@ -318,6 +318,8 @@ func Merge(body []byte, cur settings.Settings, web bool) (settings.Settings, err
 
 	in.Port = cur.Port                           // set on its own (port), which moves the gateway
 	in.CORSOrigins = cur.CORSOrigins             // set on its own (cors)
+	in.M365 = cur.M365                           // set on its own (m365), which starts the listener
+	in.M365KeyID = cur.M365KeyID                 // and names its revocable gateway key
 	in.AllowIPs = cur.AllowIPs                   // set on its own (allowips)
 	in.MTLS = cur.MTLS                           // set on its own (mtls)
 	in.HTTPS = cur.HTTPS                         // set on its own (https)

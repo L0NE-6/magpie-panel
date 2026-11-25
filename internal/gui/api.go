@@ -2222,13 +2222,13 @@ func Handler(w Windows, gw *gateway.Server) http.Handler {
 			return
 		}
 		v := strings.TrimSpace(in.Model)
-		if v != "" && v != "off" {
-			if _, _, ok := provider.Resolve(v); !ok {
+		s := settings.Load()
+		if v != "" && v != "off" && v != s.CodexDescriptions {
+			if !settingsapi.ModelServed(v) {
 				fail(rw, fmt.Errorf("no model %s to write Codex's descriptions", v))
 				return
 			}
 		}
-		s := settings.Load()
 		s.CodexDescriptions = v
 		if err := settings.Save(s); err != nil {
 			fail(rw, err)
@@ -2245,13 +2245,13 @@ func Handler(w Windows, gw *gateway.Server) http.Handler {
 			return
 		}
 		v := strings.TrimSpace(in.Model)
-		if v != "" && v != "off" {
-			if _, _, ok := provider.Resolve(v); !ok {
+		s := settings.Load()
+		if v != "" && v != "off" && v != s.CodexPredictions {
+			if !settingsapi.ModelServed(v) {
 				fail(rw, fmt.Errorf("no model %s to write Codex's composer predictions", v))
 				return
 			}
 		}
-		s := settings.Load()
 		s.CodexPredictions = v
 		if err := settings.Save(s); err != nil {
 			fail(rw, err)
@@ -2311,13 +2311,13 @@ func Handler(w Windows, gw *gateway.Server) http.Handler {
 			return
 		}
 		v := strings.TrimSpace(in.Model)
-		if v != "" && v != "off" {
-			if _, _, ok := provider.Resolve(v); !ok {
+		s := settings.Load()
+		if v != "" && v != "off" && v != s.CodexTitles {
+			if !settingsapi.ModelServed(v) {
 				fail(rw, fmt.Errorf("no model %s to write Codex's titles", v))
 				return
 			}
 		}
-		s := settings.Load()
 		s.CodexTitles = v
 		if err := settings.Save(s); err != nil {
 			fail(rw, err)

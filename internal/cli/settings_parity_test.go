@@ -574,6 +574,14 @@ var notYet = map[string]string{
 	"POST /api/whatsnew/today":                   W,  // whatsnew.go
 }
 
+// m365NotYet is kept apart so its longest route does not widen every
+// aligned entry in notYet.
+var m365NotYet = map[string]string{
+	"POST /api/settings/m365":                      W, // m365.go: starts the loopback HTTPS listener and keeps its revocable key
+	"POST /api/settings/m365/key":                  W, // m365.go: copies the Office add-in's gateway key
+	"POST /api/settings/m365/certificate/{action}": W, // m365.go: installs or removes the local CA on macOS
+}
+
 // guiRoutes are the /api routes internal/gui serves, as "METHOD /path".
 func guiRoutes(t *testing.T) []string {
 	t.Helper()
@@ -612,10 +620,13 @@ func TestEveryRouteHasACommandOrIsNamed(t *testing.T) {
 	for _, r := range routes {
 		cmd, has := cliForRoute[r]
 		_, later := notYet[r]
+		_, laterM365 := m365NotYet[r]
 		switch {
 		case has && later:
 			t.Errorf("%s has a command (%s) and is in notYet: take it out of notYet", r, cmd)
-		case !has && !later:
+		case has && laterM365:
+			t.Errorf("%s has a command (%s) and is in m365NotYet: take it out of m365NotYet", r, cmd)
+		case !has && !later && !laterM365:
 			t.Errorf("%s has no command: name the one that does what it does in cliForRoute, or say why there's none yet in notYet", r)
 		}
 	}
@@ -628,9 +639,11 @@ func TestEveryRouteHasACommandOrIsNamed(t *testing.T) {
 			t.Errorf("%s: %q isn't a magpie command", r, cmd)
 		}
 	}
-	for r := range notYet {
-		if !slices.Contains(routes, r) {
-			t.Errorf("notYet names %s, which internal/gui doesn't serve", r)
+	for _, later := range []map[string]string{notYet, m365NotYet} {
+		for r := range later {
+			if !slices.Contains(routes, r) {
+				t.Errorf("notYet names %s, which internal/gui doesn't serve", r)
+			}
 		}
 	}
 }

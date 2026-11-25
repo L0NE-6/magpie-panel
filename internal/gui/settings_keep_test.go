@@ -239,6 +239,7 @@ func TestSettingsSaveKeepsWhatItDoesNotSend(t *testing.T) {
 	was.MTLS = true                                   // Network and sharing's settings/mtls
 	was.Wallpaper = 1700000000000                     // Settings > General's Background image, appearance/wallpaper
 	was.HTTPS = true                                  // Network and sharing's settings/https
+	was.M365, was.M365KeyID = true, "local-key"       // Network and sharing's settings/m365
 	was.OnTop = true                                  // the title bar's pin, window/ontop
 	was.ImageResolution = "4K"                        // Settings > Images' Resolution row, sent by that row alone
 	was.RedactModelDir = "/Volumes/models"            // Privacy's Advanced › models folder, moved by its own route

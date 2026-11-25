@@ -400,6 +400,18 @@ func buildHost(p provider.Provider) string {
 	return p.VendorHost()
 }
 
+// duplicateReasoningOnce is whether a plugin's SenseNova endpoint rejects
+// one assistant turn carrying the same text under both Chat names.
+func duplicateReasoningOnce(p provider.Provider, upstream string) bool {
+	switch p.PluginProvider() {
+	case "raccoon":
+		return p.OwnModelID(upstream) == "sn-sensenova-6-8-flash-p"
+	case "sensenova":
+		return strings.HasPrefix(p.OwnModelID(upstream), "sensenova-")
+	}
+	return false
+}
+
 // failedAsText are the plugins whose vendor has no failed mark on a tool
 // result: the built-in said it in the text, "Error: " first (devin.go,
 // qoder.go), and so the chat request to the plugin says it there too.

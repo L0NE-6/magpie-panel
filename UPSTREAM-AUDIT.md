@@ -11,7 +11,7 @@ workflow, and verified local integrations.
 | :--- | :--- | :--- |
 | [#136](https://github.com/yetone/magpie/pull/136) | Integrated in panel | Ported the isolated identity-forget behavior as `c6f5056`; focused tests and race checks pass. |
 | [#777](https://github.com/yetone/magpie/pull/777) | Conflicting / dirty | P3. Needs a current multi-login fixture; may break one-click sign-in. |
-| [#930](https://github.com/yetone/magpie/pull/930) | Conflicting / dirty | P1. Windows Codex CLI update path; needs rollback and `.old` cleanup checks. |
+| [#930](https://github.com/yetone/magpie/pull/930) | Integrated in panel | Windows npm hardlink update path is `ab72db8`; 10 focused tests, repeated runs, vet and gofmt pass. Real npm/UAC update remains unverified. |
 | [#951](https://github.com/yetone/magpie/pull/951) | Conflicting / dirty | P3 wording change; product naming decision still required. |
 | [#977](https://github.com/yetone/magpie/pull/977) | Conflicting / dirty | P2 usage forecast; needs rebase against the current Usage layout. |
 | [#978](https://github.com/yetone/magpie/pull/978) | Conflicting / dirty | P2 Usage layout; needs narrow-screen and Playwright regression checks. |

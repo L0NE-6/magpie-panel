@@ -42,18 +42,8 @@ func TestArtifactsCommand(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a2, err := artifact.PublishPage(artifact.Publish{ID: a.ID, Page: []byte("<title>Q3 report</title>2"), Agent: "codex"})
-	if err != nil {
+	if _, err := artifact.PublishPage(artifact.Publish{ID: a.ID, Page: []byte("<title>Q3 report</title>2"), Agent: "codex"}); err != nil {
 		t.Fatal(err)
-	}
-	// Updated is kept to milliseconds. Wait until the clock has moved past
-	// a's second publish, so the list tests "most recently updated first"
-	// rather than the random ID tie-break when both publishes share a tick
-	// (#7757, the same cause as #7755).
-	for until := time.Now().Add(time.Second); !time.Now().UTC().Truncate(time.Millisecond).After(a2.Updated); time.Sleep(time.Millisecond) {
-		if time.Now().After(until) {
-			t.Fatalf("clock did not move past %s", a2.Updated)
-		}
 	}
 	b, err := artifact.PublishPage(artifact.Publish{Page: []byte("<title>Old one</title>"), Agent: "some-agent"})
 	if err != nil {

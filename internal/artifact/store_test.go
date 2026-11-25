@@ -112,14 +112,6 @@ func TestListAndDelete(t *testing.T) {
 	dir := sandbox(t)
 	a, _ := PublishPage(Publish{Page: []byte("a"), Title: "First"})
 	b, _ := PublishPage(Publish{Page: []byte("b"), Title: "Second"})
-	// Updated is truncated to milliseconds. Wait for the clock to move past
-	// b's timestamp, so this tests "most recently updated first" rather than
-	// whichever random ID sorts first when both timestamps are equal (#7755).
-	for until := time.Now().Add(time.Second); !time.Now().UTC().Truncate(time.Millisecond).After(b.Updated); time.Sleep(time.Millisecond) {
-		if time.Now().After(until) {
-			t.Fatalf("clock did not move past %s", b.Updated)
-		}
-	}
 	PublishPage(Publish{ID: a.ID, Page: []byte("a2")})
 	// a folder with no meta.json (a publish cut short) isn't listed
 	os.MkdirAll(filepath.Join(dir, strings.Repeat("a", 26)), 0o700)
@@ -141,6 +133,62 @@ func TestListAndDelete(t *testing.T) {
 	}
 	if err := Delete(a.ID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("deleted it twice: %v", err)
+	}
+}
+
+// Two publishes in one millisecond, or after the wall clock moves back,
+// still get distinct timestamps in publish order (#7757).
+func TestPublishTimestampsFollowPublishOrder(t *testing.T) {
+	sandbox(t)
+	fixed := time.Date(2026, 11, 26, 1, 0, 0, 0, time.UTC)
+	oldClock := clock
+	clock = func() time.Time { return fixed }
+	t.Cleanup(func() { clock = oldClock })
+
+	a, err := PublishPage(Publish{Page: []byte("a")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := PublishPage(Publish{Page: []byte("b")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !b.Updated.After(a.Updated) {
+		t.Fatalf("same-millisecond publishes kept the wall-clock tie: a=%s b=%s", a.Updated, b.Updated)
+	}
+	listed, err := List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(listed) != 2 || listed[0].ID != b.ID || listed[1].ID != a.ID {
+		t.Fatalf("same-millisecond list order: %+v", listed)
+	}
+
+	a2, err := PublishPage(Publish{ID: a.ID, Page: []byte("a2")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !a2.Updated.After(b.Updated) {
+		t.Fatalf("an update kept the wall-clock tie: update=%s newest=%s", a2.Updated, b.Updated)
+	}
+	listed, err = List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(listed) != 2 || listed[0].ID != a.ID || listed[1].ID != b.ID {
+		t.Fatalf("update list order: %+v", listed)
+	}
+
+	// A new process has an empty in-memory clock; the files still tell it
+	// where publish order ended.
+	publishClock.dir = ""
+	publishClock.last = time.Time{}
+	c, err := PublishPage(Publish{Page: []byte("c")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !c.Updated.After(a2.Updated) {
+		t.Fatalf("a restarted process reused a timestamp: new=%s previous=%s", c.Updated, a2.Updated)
 	}
 }
 

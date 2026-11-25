@@ -152,6 +152,34 @@ var (
 
 var mu sync.Mutex
 
+// clock is the wall clock a publish stamps, a variable for tests.
+var clock = time.Now
+
+// publishClock keeps publish order when the wall clock stays in one
+// millisecond or moves backwards. It is reset when Dir changes, as tests
+// do, and is read only while the store lock is held.
+var publishClock struct {
+	dir  string
+	last time.Time
+}
+
+func nextPublishedAtLocked() time.Time {
+	dir := Dir()
+	if publishClock.dir != dir {
+		publishClock.dir = dir
+		publishClock.last = time.Time{}
+		if list, _ := List(); len(list) > 0 {
+			publishClock.last = list[0].Updated
+		}
+	}
+	now := clock().UTC().Truncate(time.Millisecond)
+	if !publishClock.last.IsZero() && !now.After(publishClock.last) {
+		now = publishClock.last.Add(time.Millisecond)
+	}
+	publishClock.last = now
+	return now
+}
+
 // lock holds the store against this process and another magpie.
 func lock() func() {
 	mu.Lock()
@@ -387,10 +415,11 @@ func PublishPage(p Publish) (*Artifact, error) {
 	desc := oneLine(p.Description, maxDescription)
 
 	defer lock()()
-	now := time.Now().UTC().Truncate(time.Millisecond)
+	var now time.Time
 	var a *Artifact
 	var prev *Version
 	if p.ID == "" {
+		now = nextPublishedAtLocked()
 		a = &Artifact{ID: newID(), Created: now}
 	} else {
 		var err error
@@ -419,6 +448,7 @@ func PublishPage(p Publish) (*Artifact, error) {
 		if bad != nil {
 			return nil, &FileConflict{Newest: prev.N, Paths: bad}
 		}
+		now = nextPublishedAtLocked()
 	}
 	n := 1
 	if prev != nil {

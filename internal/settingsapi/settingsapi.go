@@ -16,7 +16,6 @@ import (
 
 	"github.com/yetone/magpie/internal/catalog"
 	"github.com/yetone/magpie/internal/gateway"
-	"github.com/yetone/magpie/internal/provider"
 	"github.com/yetone/magpie/internal/settings"
 )
 
@@ -446,12 +445,12 @@ func Merge(body []byte, cur settings.Settings, web bool) (settings.Settings, err
 	in.GatewayMode = cur.GatewayMode
 	in.NoAccountDiscovery = cur.NoAccountDiscovery // set on its own (account-discovery, or the CLI)
 	if v := strings.TrimSpace(in.Vision); v != "" && v != "off" && v != cur.Vision {
-		if _, _, ok := provider.Resolve(v); !ok {
+		if !ModelServed(v) {
 			return in, fmt.Errorf("no model %s to describe images", v)
 		}
 	}
 	if v := strings.TrimSpace(in.ImageGen); v != "" && v != "off" && v != cur.ImageGen {
-		if gateway.DrawerMissingOf(v) != "" {
+		if !ImageGenServed(v) {
 			return in, fmt.Errorf("no model %s to generate images", v)
 		}
 	}

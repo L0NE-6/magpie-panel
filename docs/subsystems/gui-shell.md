@@ -42,6 +42,21 @@ three.
 
 ## Constraints and failure behavior
 
+### Settings model picks
+
+A new image-recognition or Codex title, description or composer-prediction
+pick must name a model or group in `provider.Served`, including unlisted
+providers and either spelling of a routing group. Image generation uses the
+same `settingsapi.ImageGenModels` list as its picker, which includes
+subscription image models absent from the chat catalog and routing groups
+whose members draw, while leaving out hidden drawers and chat-only models.
+A new unavailable pick answers 400 and leaves the saved settings untouched.
+Re-sending an already saved pick keeps it when its provider or model has
+disappeared, so another Settings save does not force a replacement.
+Automatic and Off keep their existing meanings. See
+`TestSettingsModelsMustBeServed` and `TestImageGenCodexOneEntry` in
+[`internal/gui`](../../internal/gui).
+
 ### First opening of an agent's Details
 
 In the main window, `expandLink` in

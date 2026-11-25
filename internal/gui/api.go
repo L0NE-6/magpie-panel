@@ -1010,38 +1010,11 @@ func settingsState() settingsJSON {
 	}
 	searchState(&s)
 	s.ImageGenAuto, s.ImageGenModels, s.ImageGenMissing = gateway.AutoDrawer(), []modelRef{}, gateway.DrawerMissing()
-	for _, p := range provider.All() {
-		if !p.On() || p.DecideOnly() {
-			continue
-		}
-		// those unticked in its editor left out, but the one picked here
-		// (321sssrt on X): a hidden pick still draws, and shows as picked
-		for _, m := range gateway.Drawers(p) {
-			if p.DrawerHidden(m.ID) && gateway.ListedDrawer(s.ImageGen) != p.ID+"/"+m.ID {
-				continue
-			}
-			name := m.Name
-			if name == "" {
-				name = m.ID
-			}
-			s.ImageGenModels = append(s.ImageGenModels, modelRef{ID: p.ID + "/" + m.ID, Name: name, Provider: p.ID, PName: p.Name, Icon: p.Icon, VendorPicks: gateway.VendorPicksDrawer(p)})
-		}
-	}
-	// the routing groups with a member that draws (7up6666 on X): a
-	// group picked here draws on its members in its routing's order. One
-	// of image models only isn't served to agents (jzw690 on X), so it is
-	// listed from the groups themselves
-	listed := map[string]bool{}
-	for _, e := range provider.Served() {
-		if e.Group != "" && gateway.GroupDraws(e.ID) {
-			listed[e.ID] = true
-			s.ImageGenModels = append(s.ImageGenModels, modelRef{ID: e.ID, Name: e.Name, PName: e.Group})
-		}
-	}
-	for _, g := range provider.Groups() {
-		if ref := g.Ref(); !g.Hidden && !g.Disabled && !listed[ref] && gateway.GroupDraws(ref) {
-			s.ImageGenModels = append(s.ImageGenModels, modelRef{ID: ref, Name: cmp.Or(g.Name, g.ID), PName: g.ID})
-		}
+	for _, m := range settingsapi.ImageGenModels(s.ImageGen) {
+		s.ImageGenModels = append(s.ImageGenModels, modelRef{
+			ID: m.ID, Name: m.Name, Provider: m.Provider, PName: m.ProviderName,
+			Icon: m.Icon, VendorPicks: m.VendorPicks,
+		})
 	}
 	if v := gateway.ListedDrawer(s.ImageGen); v != s.ImageGen {
 		s.ImageGenShown = v
@@ -2215,13 +2188,13 @@ func Handler(w Windows, gw *gateway.Server) http.Handler {
 			return
 		}
 		v := strings.TrimSpace(in.Model)
-		if v != "" && v != "off" {
-			if _, _, ok := provider.Resolve(v); !ok {
+		s := settings.Load()
+		if v != "" && v != "off" && v != s.CodexDescriptions {
+			if !settingsapi.ModelServed(v) {
 				fail(rw, fmt.Errorf("no model %s to write Codex's descriptions", v))
 				return
 			}
 		}
-		s := settings.Load()
 		s.CodexDescriptions = v
 		if err := settings.Save(s); err != nil {
 			fail(rw, err)
@@ -2238,13 +2211,13 @@ func Handler(w Windows, gw *gateway.Server) http.Handler {
 			return
 		}
 		v := strings.TrimSpace(in.Model)
-		if v != "" && v != "off" {
-			if _, _, ok := provider.Resolve(v); !ok {
+		s := settings.Load()
+		if v != "" && v != "off" && v != s.CodexPredictions {
+			if !settingsapi.ModelServed(v) {
 				fail(rw, fmt.Errorf("no model %s to write Codex's composer predictions", v))
 				return
 			}
 		}
-		s := settings.Load()
 		s.CodexPredictions = v
 		if err := settings.Save(s); err != nil {
 			fail(rw, err)
@@ -2304,13 +2277,13 @@ func Handler(w Windows, gw *gateway.Server) http.Handler {
 			return
 		}
 		v := strings.TrimSpace(in.Model)
-		if v != "" && v != "off" {
-			if _, _, ok := provider.Resolve(v); !ok {
+		s := settings.Load()
+		if v != "" && v != "off" && v != s.CodexTitles {
+			if !settingsapi.ModelServed(v) {
 				fail(rw, fmt.Errorf("no model %s to write Codex's titles", v))
 				return
 			}
 		}
-		s := settings.Load()
 		s.CodexTitles = v
 		if err := settings.Save(s); err != nil {
 			fail(rw, err)
@@ -2353,7 +2326,7 @@ func Handler(w Windows, gw *gateway.Server) http.Handler {
 			// Resolve intentionally accepts arbitrary names under a known
 			// provider. An approval reviewer must be a model or group magpie
 			// actually lists, including providers kept unlisted for routing.
-			if !slices.ContainsFunc(provider.Served(), func(e provider.Entry) bool { return e.ID == v || e.Group != "" && provider.SameRef(e.ID, v) }) {
+			if !settingsapi.ModelServed(v) {
 				fail(rw, fmt.Errorf("no model %s for Codex's auto-review", v))
 				return
 			}

@@ -63,6 +63,14 @@ the shared session listing and transcript switches.
 | [#7438](https://github.com/yetone/magpie/issues/7438) | Open; no deterministic reproduction or patch | Static audits found no deletion path in the update apply flow or the resident plugin JavaScript. The update swap is two file renames and the idle transition performs no filesystem cleanup. The remaining suspects are the external `agy` 1.5.14 artifact, whose fingerprint is no longer retrievable, and a machine-local idle-triggered action outside the captured USN window. Sysmon is now installed on the reporter's machine. Do not mark this fixed without a process-level reproduction. |
 | [#7708](https://github.com/yetone/magpie/issues/7708) | Open product decision; no patch under the current contract | Upstream's check shows the search provider receives only magpie's isolated search ask, not the agent conversation, and the Routing row records `kind: web_search` with the originating agent/model. Native search is a global Automatic slot; `visible` and `hiddenModels` narrow model lists but do not scope that slot. Per-agent search isolation needs a maintainer decision on fallback semantics rather than a mechanical fix. |
 
+## Product and Feature Decisions
+
+| Item | Current state | Boundary |
+| :--- | :--- | :--- |
+| [#7743](https://github.com/yetone/magpie/issues/7743) | Open design | Serving an artifact's store, Claude bridge, self-version writes and blobs from another computer needs a capability-token scope, same-site write protection and a fresh Origin/null/Host-rebinding review for every route. A mechanical patch would widen a remote trust boundary without an upstream contract. |
+| [#7741](https://github.com/yetone/magpie/issues/7741) | Open feature | Bulk import of Codex enterprise workspace accounts needs a vendor API and UX contract for credentials, account deduplication, failures and revocation. It is not a regression that can be fixed safely from the current provider interface alone. |
+| [#7756](https://github.com/yetone/magpie/issues/7756) | Open design | A declarative project-scoped resource-writer contract must preserve the Library's single-writer ledger, path confinement, `MainOnly` worktree rules, clean withdrawal and plugin reload isolation. Implementing only a filesystem hook would bypass those invariants. |
+
 ## Open Pull Requests
 
 | PR | Current state | Maintenance note |

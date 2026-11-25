@@ -7355,7 +7355,7 @@ func (s *Server) passthrough(w http.ResponseWriter, r *http.Request, p provider.
 		// Kimi and OpenAI turn the whole request away for: what a fork
 		// at an earlier turn or a stopped reply leaves (Paidaixinbao on X)
 		body = toolPairsOut(body)
-		if mistral := p.VendorPreset() == "mistral" || p.VendorHost() == "api.mistral.ai"; !mistral && (chatReplaysReasoning(buildHost(p), model) || chatReplaysReasoning(buildHost(p), upstream)) {
+		if mistral := p.VendorPreset() == "mistral" || p.VendorHost() == "api.mistral.ai"; !mistral && (chatWantsReasoning(buildHost(p), model) || chatWantsReasoning(buildHost(p), upstream)) {
 			// a tool call the client kept no thinking for, which DeepSeek
 			// turns the whole request away for (#1462)
 			body = withReasoningOnToolTurns(body)
@@ -8162,7 +8162,9 @@ func (s *Server) passthrough(w http.ResponseWriter, r *http.Request, p provider.
 		}
 	}
 	// a message the upstream gave no phase gets one, as OpenAI's own
-	// models' do (phase.go, #2437); it goes last, as it holds events back
+	// models' do (phase.go, #2437), and its output_text parts the
+	// annotations list the AI SDK requires (output_text_shape.go); it
+	// goes last, as it holds events back
 	var phases *phaseTidy
 	if proto == provider.Responses {
 		phases = &phaseTidy{sse: sse}

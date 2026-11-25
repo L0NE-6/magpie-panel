@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -269,6 +270,10 @@ type updater struct {
 	// change, so the update runs after Windows' administrator prompt
 	admin  bool
 	prefix string
+	// pkgDir is the package's folder when bin is a native .exe beside
+	// npm's shim: npm replaces files under it, so a hard link from bin
+	// there is relinked after the update (hardLink, relinkExe).
+	pkgDir string
 	// latest is the newest its own updater would install (cliSpec.latest)
 	latest func() string
 	// reshim is run after the update: the version manager whose shim the
@@ -404,7 +409,7 @@ func fromNodeModules(pkg string, scripts bool, bin, real string) *updater {
 	modules := ""
 	if i := strings.Index(real, mark); i >= 0 {
 		modules = real[:i] + "/node_modules"
-	} else if shimNames(bin, pkg) {
+	} else if shimNames(bin, pkg) || shimExeNames(bin, pkg) {
 		modules = filepath.ToSlash(filepath.Join(filepath.Dir(bin), "node_modules"))
 		if !isDir(filepath.Join(filepath.FromSlash(modules), filepath.FromSlash(pkg))) {
 			modules = "" // pnpm's shims name a store elsewhere
@@ -465,6 +470,9 @@ func fromNodeModules(pkg string, scripts bool, bin, real string) *updater {
 		}
 	}
 	u.cmd = withScripts([]string{npm, "install", "-g", "--prefix", prefix}, "npm", pkg, scripts)
+	if strings.EqualFold(filepath.Ext(bin), ".exe") && shimExeNames(bin, pkg) {
+		u.pkgDir = filepath.Join(m, filepath.FromSlash(pkg))
+	}
 	return u
 }
 
@@ -516,6 +524,106 @@ func shimNames(bin, pkg string) bool {
 		return false
 	}
 	return strings.Contains(strings.ReplaceAll(string(b), `\`, "/"), "node_modules/"+pkg+"/")
+}
+
+// shimExeNames says whether bin, a native .exe that names nothing, stands
+// beside a small shim that names pkg. On Windows PATHEXT finds a prefix's
+// .exe before its .cmd, so a native .exe put in the prefix can be the one
+// PATH runs even though npm's .cmd beside it says how it was installed.
+func shimExeNames(bin, pkg string) bool {
+	if !strings.EqualFold(filepath.Ext(bin), ".exe") {
+		return false
+	}
+	base := strings.TrimSuffix(bin, filepath.Ext(bin))
+	for _, ext := range []string{".cmd", ".ps1"} {
+		if shimNames(base+ext, pkg) {
+			return true
+		}
+	}
+	return false
+}
+
+// hardLink is the file inside the package that bin is a hard link to — the
+// one npm's update replaces — and "" when bin is not one of them (a copy,
+// or something else altogether).
+func (u *updater) hardLink(bin string) string {
+	if u.pkgDir == "" {
+		return ""
+	}
+	want, err := os.Stat(bin)
+	if err != nil {
+		return ""
+	}
+	found := ""
+	filepath.WalkDir(u.pkgDir, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.EqualFold(d.Name(), filepath.Base(bin)) {
+			return nil
+		}
+		if st, err := os.Stat(p); err == nil && os.SameFile(want, st) {
+			found = p
+			return fs.SkipAll
+		}
+		return nil
+	})
+	return found
+}
+
+// linkFile and renameFile are os.Link and os.Rename; tests make them fail.
+var (
+	linkFile   = os.Link
+	renameFile = os.Rename
+)
+
+// relinkOldName is where a running exe is moved aside to: exe.old, or
+// exe.old-2, exe.old-3… when an earlier running image still holds that
+// name.
+func relinkOldName(exe string) string {
+	name := exe + ".old"
+	for n := 2; ; n++ {
+		if _, err := os.Lstat(name); os.IsNotExist(err) {
+			return name
+		}
+		name = fmt.Sprintf("%s.old-%d", exe, n)
+	}
+}
+
+// relinkExe puts what npm just installed into the .exe the prefix runs:
+// npm has replaced the file that .exe was a hard link to, so where it was
+// one the .exe still is the old program, and updating would look like it
+// did nothing. The old file is renamed aside first, and put back if the
+// link cannot be made. A copy, not a link, is left alone.
+func relinkExe(exe, src string) error {
+	want, err := os.Stat(exe)
+	if err != nil {
+		return nil // no .exe there any more: nothing to point at anything
+	}
+	got, err := os.Stat(src)
+	if err != nil || got.IsDir() {
+		return nil // not a file the package has now
+	}
+	if os.SameFile(want, got) {
+		return nil // the same file still: there was nothing to bring over
+	}
+	update.RemoveOld(exe) // one a rename before could not finish
+	old := relinkOldName(exe)
+	if err := renameFile(exe, old); err != nil {
+		return fmt.Errorf("couldn't move %s aside: %w", exe, err)
+	}
+	if err := linkFile(src, exe); err != nil {
+		if restoreErr := renameFile(old, exe); restoreErr != nil {
+			return errors.Join(
+				fmt.Errorf("couldn't link %s to %s: %w", exe, src, err),
+				fmt.Errorf("couldn't put %s back from %s: %w", exe, old, restoreErr),
+			)
+		}
+		return fmt.Errorf("couldn't link %s to %s: %w", exe, src, err)
+	}
+	// A running old program can keep .old until it exits. The new .exe is
+	// already in place; the next update's RemoveOld clears what is left.
+	if err := os.Remove(old); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		log.Printf("cli: could not remove %s: %v", old, err)
+	}
+	return nil
 }
 
 func exe(name string) string {
@@ -1155,6 +1263,9 @@ func (a *Agent) UpdateCLI() (CLI, error) {
 	}
 	defer updating.Delete(a.ID)
 	before := installedVersion(real)
+	// what npm is about to replace underneath the .exe magpie found, where
+	// that .exe is a hard link to it
+	link := u.hardLink(bin)
 	if spec.target && u.via == "self" {
 		// the version the row promised, so its own updater needn't ask
 		// GitHub's API for the newest (see cliSpec.target); npm, bun,
@@ -1182,9 +1293,14 @@ func (a *Agent) UpdateCLI() (CLI, error) {
 		runUpdate(ctx, &updater{via: "reshim", cmd: u.reshim})
 	}
 	versions.forget(real)
+	versions.forget(bin)
 	shimTargets.forget(bin)
 	// brew upgrade updates Homebrew first, which may know a newer one
 	latests.forget("brew:" + u.pkg)
+	var relinkErr error
+	if err == nil && link != "" {
+		relinkErr = relinkExe(bin, link)
+	}
 	c, _ := a.CLI()
 	if err != nil {
 		msg := lastLines(string(out), 3)
@@ -1192,6 +1308,9 @@ func (a *Agent) UpdateCLI() (CLI, error) {
 			msg = strings.TrimSpace(msg + " " + err.Error())
 		}
 		return c, fmt.Errorf("%s: %s", u.shown(), msg)
+	}
+	if relinkErr != nil {
+		return c, fmt.Errorf("%s was updated, but %s is a hard link npm left on the old file: %v", a.Name, bin, relinkErr)
 	}
 	if updateGOOS == "windows" && !isFile(bin) {
 		// npm took the old shims away and stopped before it wrote the new

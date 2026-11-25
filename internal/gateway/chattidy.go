@@ -596,7 +596,7 @@ func (t *chatTidy) nameless(choice int, raw json.RawMessage) (json.RawMessage, b
 			name, has = fn["name"]
 		}
 		switch {
-		case has && aName(name):
+		case has && !namesNothing(name):
 			if t.named == nil {
 				t.named = map[int]bool{}
 			}

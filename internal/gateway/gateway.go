@@ -7431,6 +7431,9 @@ func (s *Server) passthrough(w http.ResponseWriter, r *http.Request, p provider.
 		body = withoutFields(body, "stream")
 		// a signature another provider gave goes to none (ownSignatures)
 		body = geminiBodySignatures(body, p.ID, true)
+		// a call naming no function, and the response to it, as Messages,
+		// Responses and Chat relayed requests leave them out (#7728)
+		body = namelessGeminiOut(body)
 		// a conversation ending with the model's turn, which every
 		// upstream of Gemini's own shape turns away, is asked with a user
 		// turn after it, as the translation of one is (#7702)
@@ -8223,6 +8226,14 @@ func (s *Server) passthrough(w http.ResponseWriter, r *http.Request, p provider.
 	if proto == provider.Responses && sse && !fromCodex(r.Header) && agentOf(r) != "codex" {
 		enumTidy = &responsesEnumTidy{}
 	}
+	// a call naming no function in a reply relayed as it came: dropped
+	// with the rest of it, and the reply's end mended when those were its
+	// only calls (nameless_relay.go, #7728). A Chat stream's was already
+	// left out (chattidy.nameless, #1475)
+	var noName *namelessRelay
+	if proto == provider.Responses || proto == provider.Anthropic || proto == provider.Gemini {
+		noName = &namelessRelay{proto: proto, sse: sse}
+	}
 	// out is what a filter let through, through ids, phases, toolIDs and
 	// thinkSigs
 	out := func(b []byte) []byte {
@@ -8370,6 +8381,9 @@ func (s *Server) passthrough(w http.ResponseWriter, r *http.Request, p provider.
 			if search != nil {
 				out = search.write(out)
 			}
+			if noName != nil {
+				out = noName.write(out)
+			}
 			// crArgs before ints: ints runs on every reply now and holds
 			// one that came whole to its own flush, which crArgs, after it,
 			// would never see (#3152 beside #4256's glm-5.3-flash routes)
@@ -8417,7 +8431,7 @@ func (s *Server) passthrough(w http.ResponseWriter, r *http.Request, p provider.
 	}
 	// what's held at the end goes through the filters after the one
 	// that held it
-	sign := func(b []byte) []byte {
+	postName := func(b []byte) []byte {
 		if crArgs != nil {
 			b = crArgs.write(b)
 		}
@@ -8434,6 +8448,12 @@ func (s *Server) passthrough(w http.ResponseWriter, r *http.Request, p provider.
 			b = sigs.write(b)
 		}
 		return out(b)
+	}
+	sign := func(b []byte) []byte {
+		if noName != nil {
+			b = noName.write(b)
+		}
+		return postName(b)
 	}
 	if tidy != nil {
 		out := tidy.flush()
@@ -8460,6 +8480,14 @@ func (s *Server) passthrough(w http.ResponseWriter, r *http.Request, p provider.
 	}
 	if spaces != nil {
 		write(sign(spaces.flush()))
+	}
+	if noName != nil {
+		// Drain after the preceding filters, which can hold the last event.
+		b := postName(noName.flush())
+		if enumTidy != nil {
+			b = enumTidy.write(b)
+		}
+		write(b)
 	}
 	if crArgs != nil {
 		b := crArgs.flush()

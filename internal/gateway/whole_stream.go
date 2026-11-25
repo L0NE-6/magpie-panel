@@ -114,7 +114,7 @@ func chatWholeEvents(b []byte) []wholeEvent {
 			var kept []obj
 			for _, call := range calls {
 				var fn obj
-				if json.Unmarshal(call["function"], &fn) != nil || !aName(fn["name"]) {
+				if json.Unmarshal(call["function"], &fn) != nil || namesNothing(fn["name"]) {
 					// a call naming no function in a string runs nowhere
 					// and no client can read (#1475): dropped, as a written
 					// block naming no offered tool is

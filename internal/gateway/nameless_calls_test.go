@@ -224,14 +224,12 @@ func TestNamelessCallTranslatedBothWays(t *testing.T) {
 	}
 }
 
-// A translated reply on each API a client speaks hands it no call naming
-// nothing, whichever API the upstream answered on.
+// A reply on each API a client speaks hands it no call naming nothing,
+// whichever API the upstream answered on — translated, or relayed as the
+// upstream sent it (#7728).
 func TestNamelessCallNeverReachesClient(t *testing.T) {
 	for _, upAPI := range []provider.Protocol{provider.Responses, provider.Chat, provider.Anthropic} {
 		for _, client := range []string{"/v1/messages", "/v1/chat/completions", "/v1/responses"} {
-			if upAPI == provider.Anthropic && client == "/v1/messages" || upAPI == provider.Chat && client == "/v1/chat/completions" || upAPI == provider.Responses && client == "/v1/responses" {
-				continue // relayed, not translated
-			}
 			for _, stream := range []bool{true, false} {
 				t.Run(string(upAPI)+client+map[bool]string{true: "/stream", false: "/whole"}[stream], func(t *testing.T) {
 					fresh(t)

@@ -18,11 +18,15 @@ import (
 //
 //   - a translated reply never hands its client a call naming nothing
 //     (namelessEncoder, namelessResult), on every API the client speaks;
+//   - a reply relayed as the upstream sent it hands none either
+//     (nameless_relay.go, #7728), on Responses, Messages and Gemini, its
+//     end mended when the calls it dropped were the only ones;
 //   - a history that holds one already goes out without it and without the
 //     results answering it: translated, on every API magpie builds
 //     (withoutNamelessCalls, in afterParse), and relayed as the client
-//     wrote it, on Messages, Responses and Chat (namelessBlocksOut,
-//     namelessItemsOut, namelessChatCallsOut). The call and its answer go
+//     wrote it, on Messages, Responses, Chat and Gemini (namelessBlocksOut,
+//     namelessItemsOut, namelessChatCallsOut, namelessGeminiOut). The call
+//     and its answer go
 //     together, so what is left still pairs.
 
 // withoutNamelessCalls leaves out of r's history every tool call that

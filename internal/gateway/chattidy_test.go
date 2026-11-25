@@ -144,11 +144,14 @@ func TestChatTidyToolCallNames(t *testing.T) {
 		t.Fatalf("merged %q %q", name, args)
 	}
 
-	// every empty name of a multi-call, multi-choice chunk goes
+	// every empty name goes: on the open call's later fragment the member
+	// alone (the name went with the first, "a" stays), and on a fragment
+	// that opens a call — "b" and "c" here — the call with it, for one
+	// naming no function is no call (#7728)
 	multi := `data: {"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"name":"","arguments":"a"}},{"index":1,"function":{"name":"","arguments":"b"}}]}},{"index":1,"delta":{"tool_calls":[{"index":0,"function":{"name":"","arguments":"c"}}]}}]}` + "\n"
 	out := string(tidy.write([]byte(multi)))
 	if strings.Contains(out, `"name":""`) || !strings.Contains(out, `"arguments":"a"`) ||
-		!strings.Contains(out, `"arguments":"b"`) || !strings.Contains(out, `"arguments":"c"`) {
+		strings.Contains(out, `"arguments":"b"`) || strings.Contains(out, `"arguments":"c"`) {
 		t.Fatalf("got %q", out)
 	}
 }

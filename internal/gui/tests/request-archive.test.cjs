@@ -32,7 +32,7 @@ const row = (i, model, archive) => ({
 });
 const ROWS = [row(0, "kept", KEPT), row(1, "plain")];
 
-function serve(lang, seen) {
+function serve(lang, seen, boot = {}) {
   const where = "bkt/team on https://s3.example.com";
   const here = { folder: "~/.config/magpie/request-archive", cap: 1 << 30 };
   const gateway = { running: true, window: true, mine: true, url: "http://127.0.0.1:3999", groups: [], archive: { on: false, ...here },
@@ -41,11 +41,14 @@ function serve(lang, seen) {
   return async (route) => {
     const url = new URL(route.request().url());
     const json = (data, status = 200) => route.fulfill({ status, json: data });
-    if (url.pathname === "/boot.js") return route.fulfill({ contentType: "text/javascript", body: `window.bootPrefs = {lang:"${lang}",theme:"light",web:true};` });
+    if (url.pathname === "/boot.js") return route.fulfill({ contentType: "text/javascript", body: `window.bootPrefs = ${JSON.stringify({ lang, theme: "light", web: true, ...boot })};` });
     if (url.pathname === "/wails/runtime.js") return route.fulfill({ contentType: "text/javascript", body: "export const Window = {};" });
     if (url.pathname === "/api/state") return json({ agents: [], profiles: [], settings: { lang, theme: "light" } });
     // the list leaves the bodies out, and an opened row asks for its own by id (#1521)
-    if (url.pathname === "/api/providers") return json({ ...providers, gateway: { ...providers.gateway, calls: providers.gateway.calls.map(({ requestBody, responseBody, ...c }, i) => ({ id: i + 1, ...c })) } });
+    if (url.pathname === "/api/providers") {
+      seen.providerReads = (seen.providerReads || 0) + 1;
+      return json({ ...providers, gateway: { ...providers.gateway, calls: providers.gateway.calls.map(({ requestBody, responseBody, ...c }, i) => ({ id: i + 1, ...c })) } });
+    }
     if (url.pathname === "/api/gateway/call") return json(providers.gateway.calls[Number(url.searchParams.get("id")) - 1]);
     if (url.pathname === "/api/groups") return json({ groups: [], models: [] });
     if (url.pathname === "/api/plugins") return json({ plugins: [] });
@@ -209,6 +212,31 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         "Not in the archive on this computer: it is saved just after the call, the oldest are removed past the archive's size, or the save failed (magpie's log says why)",
       ].flatMap((k) => ["zh", "zh-TW", "ja", "de"].filter((l) => !I18N[l][k]).map((l) => l + " " + k)));
       assert.deepEqual(missing, [], "every string has its Chinese, Japanese and German");
+      assert.deepEqual(errors, []);
+    });
+
+    test(`${engine} ${lang}: the archive's switch is drawn when the page opens on Usage`, async (t) => {
+      const w = words[lang];
+      const browser = await (engine === "webkit" ? webkit.launch() : chromium.launch({ channel: "chromium" }));
+      const page = await (await browser.newContext({ viewport: { width: 1000, height: 760 }, reducedMotion: "reduce" })).newPage();
+      t.after(() => browser.close());
+      page.setDefaultTimeout(5000);
+      page.setDefaultNavigationTimeout(60000);
+      const errors = [];
+      page.on("pageerror", (e) => errors.push(e.message));
+      const seen = [];
+      await page.route("**/*", serve(lang, seen, { sideGateway: { url: "http://127.0.0.1:3999", running: true } }));
+      await page.addInitScript(() => localStorage.setItem("magpie.usageTab", "requests"));
+      await page.goto("http://magpie.test/?view=usage");
+      const sw = page.locator("#ledArchive .led-arch-sw");
+      await sw.waitFor();
+      assert.equal(await sw.getAttribute("role"), "switch");
+      assert.equal(await sw.innerText(), w.name);
+      assert.equal(await sw.getAttribute("aria-checked"), "false", "off unless turned on");
+      assert.equal(await sw.getAttribute("title"), w.local);
+      const [swBox, sumBox] = await Promise.all([sw.boundingBox(), page.locator("#ledSum").boundingBox()]);
+      assert(Math.abs(swBox.y + swBox.height / 2 - (sumBox.y + sumBox.height / 2)) <= 3, "on the line of the requests' sum");
+      assert.equal(seen.providerReads, 1, "one providers read for the first Usage open");
       assert.deepEqual(errors, []);
     });
   }

@@ -4436,7 +4436,12 @@ async function load(again) {
     // the window back on the Usage page reads the tab shown as its own timer
     // does: drawn again only on a change, with no skeleton between; on the
     // Overview, where the allowances are, that is opening them (#1588)
-    if (view === "usage") await magpie.call("usage", "refresh", again);
+    // Requests draws the archive's switch from providers.gateway; load it with
+    // the page instead of waiting for another view to have read it first.
+    if (view === "usage") await Promise.all([
+      magpie.call("usage", "refresh", again),
+      (!providers || again) && loadProviders(),
+    ]);
     // the Masking page names agents and providers from what came back
     if (view === "masking") await magpie.call("masking", "refresh", again);
     // so is an open sync form (WebDAV, export, import): its passwords are
@@ -6057,7 +6062,8 @@ saveCurrent.onclick = () => {
 let providersEarly = null;
 function prefetchProviders() {
   if (providers || providersEarly) return;
-  const e = providersEarly = { read: api("providers") };
+  // show() may already have started it; the page and sidebar share that read.
+  const e = providersEarly = { read: loadProviders.first || api("providers") };
   e.read.then((s) => {
     e.got = s;
     markNewPartners();
@@ -23575,6 +23581,7 @@ async function show(v) {
   if (v !== "providers" && editing !== null) cancelEdit(true);
   // a plugin's page loads what it shows; back once it has
   magpie.call(v, "open")?.then?.(back);
+  if (v === "usage") loadProviders().then(back, statusErr);
   if (v === "providers" && providersBehind) renderProviders();
   if (v === "providers" || rtView(v) || providersPage(v)) loadProviders().then(back, statusErr);
   // Routing's accounts' windows as Usage read them (#1833), never an asked read

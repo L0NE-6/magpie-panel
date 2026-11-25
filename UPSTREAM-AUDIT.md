@@ -9,17 +9,17 @@ workflow, and verified local integrations.
 
 | PR | Current state | Maintenance note |
 | :--- | :--- | :--- |
-| [#136](https://github.com/yetone/magpie/pull/136) | Conflicting / dirty | P1 candidate. Port only the isolated identity-forget commit `77f55168`; do not cherry-pick the old 5261-file base. |
+| [#136](https://github.com/yetone/magpie/pull/136) | Integrated in panel | Ported the isolated identity-forget behavior as `c6f5056`; focused tests and race checks pass. |
 | [#777](https://github.com/yetone/magpie/pull/777) | Conflicting / dirty | P3. Needs a current multi-login fixture; may break one-click sign-in. |
 | [#930](https://github.com/yetone/magpie/pull/930) | Conflicting / dirty | P1. Windows Codex CLI update path; needs rollback and `.old` cleanup checks. |
 | [#951](https://github.com/yetone/magpie/pull/951) | Conflicting / dirty | P3 wording change; product naming decision still required. |
 | [#977](https://github.com/yetone/magpie/pull/977) | Conflicting / dirty | P2 usage forecast; needs rebase against the current Usage layout. |
 | [#978](https://github.com/yetone/magpie/pull/978) | Conflicting / dirty | P2 Usage layout; needs narrow-screen and Playwright regression checks. |
-| [#1017](https://github.com/yetone/magpie/pull/1017) | Conflicting / dirty | P2 candidate. Reimplement providers loading for the current Usage architecture and verify `?view=usage`. |
+| [#1017](https://github.com/yetone/magpie/pull/1017) | Integrated in panel | Reimplemented for the current Usage architecture as `8a6b1c1`; Chromium regression tests pass, WebKit remains unverified. |
 | [#1020](https://github.com/yetone/magpie/pull/1020) | Clean / mergeable | CI-only installed-font test. Integrated into `panel` as `f81f1a4`; upstream remains open. |
 | [#1033](https://github.com/yetone/magpie/pull/1033) | Draft / conflicting | P2 Reasonix sessions; needs rebase, completeness tests, and a real binary check. |
 | [#1072](https://github.com/yetone/magpie/pull/1072) | Conflicting / dirty | P2 library hash behavior; preserve old-hash compatibility. |
-| [#1073](https://github.com/yetone/magpie/pull/1073) | Conflicting / dirty | P2 candidate. Use current-main port `3acb51e`; preserve saved offline values, groups, and image pickers. |
+| [#1073](https://github.com/yetone/magpie/pull/1073) | Integrated in panel | Reimplemented against the current Settings API as `b2ed15e`; focused Go tests and race checks pass. |
 | [#1074](https://github.com/yetone/magpie/pull/1074) | Conflicting / dirty | P1 redaction/OTLP masking; core acceptance is not yet green. |
 | [#1157](https://github.com/yetone/magpie/pull/1157) | Conflicting / dirty | P2 CI decision: run the whole provider race suite. |
 | [#1181](https://github.com/yetone/magpie/pull/1181) | Conflicting / dirty | P2 routing key plan windows; adapt to the current `cardFor` refactor. |

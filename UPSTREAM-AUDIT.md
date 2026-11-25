@@ -81,6 +81,7 @@ the shared session listing and transcript switches.
 
 | PR | Current state | Maintenance note |
 | :--- | :--- | :--- |
+| [#7760](https://github.com/yetone/magpie/pull/7760) | Integrated in panel as `a1450b7` | A hook's Responses reply now keeps the streamed `output_item.done` items when `response.completed` names an empty output, accepts `response.incomplete` as the reply for a cut stream, and recognizes an event type carried only on the `event:` line. Focused hook tests, 5 race iterations and vet pass; a real vendor hook was not exercised. |
 | [#136](https://github.com/yetone/magpie/pull/136) | Integrated in panel | Ported the isolated identity-forget behavior as `c6f5056`; focused tests and race checks pass. |
 | [#777](https://github.com/yetone/magpie/pull/777) | Conflicting / dirty | P3. Needs a current multi-login fixture; may break one-click sign-in. |
 | [#930](https://github.com/yetone/magpie/pull/930) | Integrated in panel | Windows npm hardlink update path is `ab72db8`; focused tests, repeated runs, vet and gofmt pass. Real npm/UAC update remains unverified. |

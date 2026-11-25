@@ -3,6 +3,7 @@ package gateway
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -167,6 +168,23 @@ func TestCustomInputStreams(t *testing.T) {
 		{`{ "input" : "spaced" }`, "spaced"},
 		{`"a lone string"`, "a lone string"},
 		{`{"input":"lone \ud83d half"}`, "lone \ufffd half"},
+		{`{"input":"rg -n -o -I '\d+' notes.txt"}`, `rg -n -o -I '\d+' notes.txt`},
+		{`{"input":"Get-ChildItem -Filter \"*.md\" C:\Users\a\Desktop"}`, `Get-ChildItem -Filter "*.md" C:\Users\a\Desktop`},
+		{`{"input":"\x41 \u12 \uZZZZ"}`, `\x41 \u12 \uZZZZ`},
+		{`{"input":"a\\\d \ud83d\ude00\q"}`, `a\\d 😀\q`},
+		{"{\"input\":\"tab\there\nnew line\"}", "tab\there\nnew line"},
+		{`{"input":"q({search_query:"go generics"})"}`, `q({search_query:"go generics"})`},
+		{`{"input":"print("a", "b")"}`, `print("a", "b")`},
+		{`{"input":"x = {"k": "v"}; y"}`, `x = {"k": "v"}; y`},
+		{`{"input":"say "hi"}`, `say "hi`},
+		{`"lone "quoted" \d"`, `lone "quoted" \d`},
+		{`{"input":"a", "path":"b.go"}`, "a"},
+		{`{"input":"a" , "p\"q" : 1}`, "a"},
+		{"{\"input\":\"a\" }\n", "a"},
+		{`{"input":"cut \`, `cut \`},
+		{`{"input":"cut \u00`, `cut \u00`},
+		{`{"input":"cut \ud83d`, "cut \ufffd"},
+		{"{\"input\":\"cut \xe2\x82", "cut \ufffd\ufffd"},
 		{`{"input":5}`, ""},
 		{`{"other":"x"}`, ""},
 		{`not json`, ""},
@@ -177,12 +195,142 @@ func TestCustomInputStreams(t *testing.T) {
 			for i := 0; i < len(c.args); i += size {
 				got.WriteString(s.feed(c.args[i:min(i+size, len(c.args))]))
 			}
+			got.WriteString(s.finish())
 			if got.String() != c.want {
 				t.Errorf("%s in pieces of %d: %q, want %q", c.args, size, got.String(), c.want)
 			}
 			if c.want != "" && customInput(c.args) != c.want {
 				t.Errorf("%s: customInput %q", c.args, customInput(c.args))
 			}
+		}
+	}
+}
+
+// What streams before the arguments end is given as it comes: a quote
+// waits only on what follows it, and the text before it isn't held back.
+func TestCustomInputStreamsAhead(t *testing.T) {
+	var s customStream
+	if got := s.feed(`{"input":"rg '\d`); got != `rg '\d` {
+		t.Fatalf("before the quote's end is known: %q", got)
+	}
+	if got := s.feed(`+' "x`); got != `+' "x` {
+		t.Fatalf("a quote followed by more input: %q", got)
+	}
+	if got := s.feed(`"`); got != "" {
+		t.Fatalf("a quote at the pieces' end: %q", got)
+	}
+	if got := s.feed(`}`); got != "" {
+		t.Fatalf("a quote then the object's end: %q", got)
+	}
+	if got := s.finish(); got != "" {
+		t.Fatalf("the end: %q", got)
+	}
+	if got := customInput(`{"input":"rg '\d+' "x"}`); got != `rg '\d+' "x` {
+		t.Fatalf("customInput %q", got)
+	}
+}
+
+// customInput gives the input the finished item carries. What no JSON
+// reads — the arguments as they came when there is no input string in
+// them — is still the answer, and what the stream held for a piece that
+// never came (the arguments cut mid-input) is given once they're whole.
+func TestCustomInputReadsTheWholeArguments(t *testing.T) {
+	for _, c := range []struct{ args, want string }{
+		{`{"input":"rg -n -o -I '\d+' notes.txt"}`, `rg -n -o -I '\d+' notes.txt`},
+		{`{"input":"q({search_query:"go generics"})"}`, `q({search_query:"go generics"})`},
+		{`{"input":"cut off`, `cut off`},
+		{`{"input":"trailing escape \`, `trailing escape \`},
+		{`{"input":"x\`, `x\`},
+		{`{"input":5}`, `{"input":5}`},
+		{`{"other":"x"}`, `{"other":"x"}`},
+		{`not json`, `not json`},
+	} {
+		if got := customInput(c.args); got != c.want {
+			t.Errorf("%s: customInput %q, want %q", c.args, got, c.want)
+		}
+	}
+}
+
+// A translated custom tool whose input contains text JSON can't read
+// still streams through to the finished item, and a non-streaming reply
+// normalizes the same input.
+func TestCustomInputThatIsntJSONTranslated(t *testing.T) {
+	for _, c := range []struct{ name, args, want string }{
+		{"undefined escape", `{"input":"rg -n -o -I '\d+' notes.txt"}`, `rg -n -o -I '\d+' notes.txt`},
+		{"bare quote", `{"input":"q({search_query:"go generics"})"}`, `q({search_query:"go generics"})`},
+	} {
+		for _, stream := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/stream=%t", c.name, stream), func(t *testing.T) {
+				fresh(t)
+				vendor := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					io.ReadAll(r.Body)
+					call := map[string]any{
+						"type": "function_call", "id": "fc_1", "call_id": "call_1",
+						"name": "apply_patch", "arguments": c.args, "status": "completed",
+					}
+					q := func(s string) string { b, _ := json.Marshal(s); return string(b) }
+					lines := []string{
+						`data: {"type":"response.created","response":{"id":"r1","model":"m"}}`,
+						`data: {"type":"response.output_item.added","output_index":0,"item":{"type":"function_call","id":"fc_1","call_id":"call_1","name":"apply_patch","arguments":""}}`,
+					}
+					for i := 0; i < len(c.args); i += 3 {
+						lines = append(lines, `data: {"type":"response.function_call_arguments.delta","output_index":0,"item_id":"fc_1","delta":`+
+							q(c.args[i:min(i+3, len(c.args))])+`}`)
+					}
+					callJSON, _ := json.Marshal(call)
+					lines = append(lines,
+						`data: {"type":"response.output_item.done","output_index":0,"item":`+string(callJSON)+`}`,
+						`data: {"type":"response.completed","response":{"id":"r1","status":"completed","output":[],"usage":{"input_tokens":5,"output_tokens":5}}}`,
+					)
+					w.Header().Set("Content-Type", "text/event-stream")
+					io.WriteString(w, sse(lines...))
+				}))
+				t.Cleanup(vendor.Close)
+				if err := provider.Save(provider.Provider{ID: "rel", Name: "Rel", Key: "k", Responses: vendor.URL + "/v1", Models: []string{"m"}}); err != nil {
+					t.Fatal(err)
+				}
+				body := fmt.Sprintf(`{"model":"rel/m","stream":%t,"input":[{"role":"user","content":"search"}],
+					"tools":[{"type":"custom","name":"apply_patch","description":"Edits files.","format":{"type":"grammar","syntax":"lark","definition":"start: /.+/"}},
+					 {"type":"web_search"}],"tool_choice":"auto"}`, stream)
+				rec := httptest.NewRecorder()
+				New().Handler().ServeHTTP(rec, httptest.NewRequest("POST", "/v1/responses", strings.NewReader(body)))
+				if rec.Code != 200 {
+					t.Fatalf("%d %s", rec.Code, rec.Body)
+				}
+				if !stream {
+					var out struct{ Output []map[string]any }
+					if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+						t.Fatal(err)
+					}
+					for _, item := range out.Output {
+						if item["type"] == "custom_tool_call" {
+							if item["input"] != c.want {
+								t.Fatalf("input %q, want %q\n%s", item["input"], c.want, rec.Body)
+							}
+							return
+						}
+					}
+					t.Fatalf("no custom_tool_call in %s", rec.Body)
+				}
+				var deltas strings.Builder
+				var done, item any
+				for _, ev := range events(rec.Body.String()) {
+					switch ev["type"] {
+					case "response.custom_tool_call_input.delta":
+						d, _ := ev["delta"].(string)
+						deltas.WriteString(d)
+					case "response.custom_tool_call_input.done":
+						done = ev["input"]
+					case "response.output_item.done":
+						if it, _ := ev["item"].(map[string]any); it["type"] == "custom_tool_call" {
+							item = it["input"]
+						}
+					}
+				}
+				if got := deltas.String(); got != c.want || done != c.want || item != c.want {
+					t.Fatalf("deltas %q, done %v, item %v, want %q\n%s", got, done, item, c.want, rec.Body)
+				}
+			})
 		}
 	}
 }

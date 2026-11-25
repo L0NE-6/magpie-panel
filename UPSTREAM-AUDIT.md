@@ -4,12 +4,19 @@ Snapshot: 2026-11-26. Upstream remains
 [`yetone/magpie`](https://github.com/yetone/magpie). The fork `main` is an
 exact mirror; `panel` contains maintenance documentation, the upstream-sync
 workflow, and verified local integrations. Upstream `main` is at
-`82127a85`.
+`3713903b`.
 
 ## Upstream Sync
 
 The panel now also includes the latest upstream changes:
 
+- `3713903b`: an import app uninstalled from the Mac is no longer listed as
+  added;
+- `03e53d19`: Nowledge Mem pointed at another machine belongs to the user,
+  and Disconnect leaves it alone;
+- `1bbd0aae`: a DSH routing group goes on the route every member is best on;
+- `ef7acbcc`: near its cap, an account stops a turn short by the amount that
+  turn spent there;
 - `8a1498a4`: a shared gateway keeps the computer awake while it is shared;
 - `108b72ee`: an upgraded account row reports its current plan and draws its
   Fable window;

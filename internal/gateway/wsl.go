@@ -346,11 +346,8 @@ func (s *Server) serveWSL(ctx context.Context, srv *http.Server) {
 		return
 	}
 	lns := map[string]net.Listener{}
-	defer func() {
-		for _, ln := range lns {
-			ln.Close()
-		}
-	}()
+	// Leave the listeners to Shutdown when ctx ends. Closing them here first
+	// makes Shutdown report net.ErrClosed as if requests were cut.
 	look := func() {
 		want := map[string]bool{}
 		via := map[string]bool{}
@@ -383,7 +380,10 @@ func (s *Server) serveWSL(ctx context.Context, srv *http.Server) {
 				ln = viaListener{ln}
 			}
 			lns[a] = ln
-			go srv.Serve(ln)
+			go func(ln net.Listener) {
+				defer ln.Close()
+				srv.Serve(ln)
+			}(ln)
 		}
 	}
 	look()

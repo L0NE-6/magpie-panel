@@ -34,7 +34,7 @@ func TestStandInInsideAnotherShapeIsLeftAlone(t *testing.T) {
 		"AbCstandinnDefGh",     // lowercase run inside mixed case
 		"standinntheuser-name", // the stand-in at the start
 		"tail-endstandinn",     // at the end
-		"a standinn b",         // wait — this one IS whole
+		"a standinn b",         // whole stand-in
 	} {
 		got := restoreShapes(s, nil)
 		if s == "a standinn b" {

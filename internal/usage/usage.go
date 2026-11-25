@@ -345,6 +345,7 @@ func Append(r Record) {
 	mu.Lock()
 	defer mu.Unlock()
 	path := Path()
+	retireOldUsageLocked(path)
 	f, before := openLog(path)
 	if f == nil {
 		return

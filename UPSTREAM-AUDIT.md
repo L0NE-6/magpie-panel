@@ -36,6 +36,7 @@ the shared session listing and transcript switches.
 | Issue | Current state | Evidence boundary |
 | :--- | :--- | :--- |
 | [#7438](https://github.com/yetone/magpie/issues/7438) | Open; no deterministic reproduction or patch | Static audits found no deletion path in the update apply flow or the resident plugin JavaScript. The update swap is two file renames and the idle transition performs no filesystem cleanup. The remaining suspects are the external `agy` 1.5.14 artifact, whose fingerprint is no longer retrievable, and a machine-local idle-triggered action outside the captured USN window. Sysmon is now installed on the reporter's machine. Do not mark this fixed without a process-level reproduction. |
+| [#7708](https://github.com/yetone/magpie/issues/7708) | Open product decision; no patch under the current contract | Upstream's check shows the search provider receives only magpie's isolated search ask, not the agent conversation, and the Routing row records `kind: web_search` with the originating agent/model. Native search is a global Automatic slot; `visible` and `hiddenModels` narrow model lists but do not scope that slot. Per-agent search isolation needs a maintainer decision on fallback semantics rather than a mechanical fix. |
 
 ## Open Pull Requests
 

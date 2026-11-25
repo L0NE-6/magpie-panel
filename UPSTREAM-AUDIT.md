@@ -4,12 +4,27 @@ Snapshot: 2026-11-26. Upstream remains
 [`yetone/magpie`](https://github.com/yetone/magpie). The fork `main` is an
 exact mirror; `panel` contains maintenance documentation, the upstream-sync
 workflow, and verified local integrations. Upstream `main` is at
-`3713903b`.
+`1f5b883a`.
 
 ## Upstream Sync
 
 The panel now also includes the latest upstream changes:
 
+- `1f5b883a`: a Remote magpie can keep alternate LAN, Tailscale or EasyTier
+  addresses and ask the one that answers;
+- `eb8402c3`: a remote magpie's dropped routing pick stays dropped after an
+  editor saves the list;
+- `5874a21a`: a routing group's classifier prompt is the user's own and does
+  not name magpie as an assistant;
+- `48fbe194`: a new session is not spread to a relay with no reads while a
+  subscription with quota leads;
+- `a7bd7a0f`: an exhausted OpenCode Go paid window no longer holds back its
+  free models;
+- `472b2c07`: the Library can show the skills used by one agent;
+- `ad51ddfa`: DSH NEXT and DSH Desktop are recognized as DeepSeekRuntime's
+  desktop app;
+- `8bed5427`: a small Gemini reply limit now leaves room for thinking above
+  it;
 - `3713903b`: an import app uninstalled from the Mac is no longer listed as
   added;
 - `03e53d19`: Nowledge Mem pointed at another machine belongs to the user,

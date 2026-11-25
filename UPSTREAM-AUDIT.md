@@ -5,6 +5,20 @@ Snapshot: 2026-11-25. Upstream remains
 exact mirror; `panel` contains maintenance documentation, the upstream-sync
 workflow, and verified local integrations.
 
+## Upstream Sync
+
+The panel includes upstream `eab4b006` and the five commits before it:
+
+- `bd0ac4ac`: CatPaw IDE conversation discovery;
+- `b94ffbec`: avoid counting encrypted GPT reasoning twice;
+- `af75743b`: include disabled accounts and keys in account tests;
+- `f7cb8aa0`: return complete account model lists from the gateway;
+- `eab4b006`: fix Codex takeover when its own model and a Magpie model are
+  wired side by side.
+
+The Reasonix integration from `#1033` and CatPaw discovery are both retained in
+the shared session listing and transcript switches.
+
 ## Open Pull Requests
 
 | PR | Current state | Maintenance note |

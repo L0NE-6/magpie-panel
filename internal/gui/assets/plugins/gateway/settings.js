@@ -194,9 +194,73 @@ function corsSays(m) {
   if (/is not an (extension's )?origin/.test(m)) return t("Write an origin as http://localhost:3000 or https://app.example.com, or a browser extension's as chrome-extension://, moz-extension:// or safari-web-extension:// followed by its ID");
   return t(m);
 }
+
+// renderM365: the opt-in loopback HTTPS listener for Claude for Microsoft
+// 365. The certificate is generated locally; trust installation is offered
+// only where this build has a validated automatic path (macOS).
+function renderM365(s) {
+  const box = $("#m365List");
+  if (!box) return;
+  box.replaceChildren();
+  const set = (on) => {
+    const request = api("settings/m365", { on }).then((res) => res.settings || res);
+    writingPrefs(request)
+      .then((ns) => { prefs = state.settings = ns; renderSettings(); status(t("Saved"), "ok", 1500); })
+      .catch((e) => { status(t(e.message), "err"); renderSettings(); });
+  };
+  const row = el("div", "row pref");
+  const who = el("div", "who");
+  who.append(
+    el("div", "name", "Claude for Microsoft 365"),
+    el("div", "sub", s.m365
+      ? t("Word, Excel and PowerPoint connect to the local HTTPS gateway.")
+      : t("Serve the gateway over loopback HTTPS for Claude in Microsoft 365.")),
+  );
+  const val = el("div", "val");
+  val.append(segs([["off", t("Off")], ["on", t("On")]], s.m365 ? "on" : "off", (v) => set(v === "on")));
+  row.append(who, val);
+  box.append(row);
+  if (!s.m365) return;
+
+  const st = s.m365Status || {};
+  const address = el("div", "row pref");
+  const addressWho = el("div", "who");
+  addressWho.append(el("div", "name", t("HTTPS address")), el("div", "sub m365-url", st.url || "https://127.0.0.1:8787"));
+  address.append(addressWho);
+  box.append(address);
+
+  const cert = st.certificate || {};
+  const certRow = el("div", "row pref");
+  const certWho = el("div", "who");
+  certWho.append(el("div", "name", t("Certificate")), el("div", "sub m365-cert", cert.certificate || cert.message || ""));
+  const certVal = el("div", "val");
+  if (s.m365CertificateActions) {
+    const trust = el("button", "text", t("Trust certificate"));
+    trust.onclick = () => api("settings/m365/certificate/install", {})
+      .then((next) => { s.m365Status.certificate = next; renderSettings(); status(t("Trusted"), "ok", 1500); })
+      .catch((e) => status(t(e.message), "err"));
+    certVal.append(trust);
+  }
+  certRow.append(certWho, certVal);
+  box.append(certRow);
+
+  const key = el("div", "row pref");
+  const keyWho = el("div", "who");
+  keyWho.append(el("div", "name", s.m365KeyName || "Claude for Microsoft 365"), el("div", "sub m365-key", s.m365KeyMasked || t("Gateway key")));
+  const keyVal = el("div", "val");
+  const copyKey = el("button", "text", t("Copy key"));
+  copyKey.onclick = () => api("settings/m365/key", {})
+    .then((res) => copy(res.secret, t("Key"), copyKey, t("Copied")))
+    .catch((e) => status(t(e.message), "err"));
+  keyVal.append(copyKey);
+  key.append(keyWho, keyVal);
+  box.append(key);
+}
+
 function renderCORS(s) {
   renderWebPage(); // Browser access, the section under this one
   renderRemote(); // Another magpie, under that
+  renderM365(s);
   const box = $("#corsList");
   box.replaceChildren();
   const origins = s.corsOrigins || [];

@@ -289,6 +289,12 @@ type Settings struct {
 	// reply, each with an enabled gateway key. None by default: a page
 	// gets no CORS headers, as before.
 	CORSOrigins []string `json:"corsOrigins,omitempty"`
+	// M365 enables the loopback-only HTTPS listener used by Claude for
+	// Microsoft 365. M365KeyID names its revocable gateway key. Both are
+	// this computer's own: neither a listener nor a local key can follow a
+	// sync or backup to another computer.
+	M365      bool   `json:"m365,omitempty"`
+	M365KeyID string `json:"m365KeyId,omitempty"`
 	// AllowIPs are the addresses (IPs and CIDR ranges) other computers may
 	// reach the gateway from at all (lc on Discord); any other is refused
 	// 403 even with a gateway key. None: every address, as before. This
@@ -1755,26 +1761,6 @@ func CarryPerModel(in, cur *Settings) {
 	}
 }
 
-// Redaction is what the gateway masks on the way to a vendor.
-func (s Settings) Redaction() redact.Options {
-	return redact.Options{Secrets: s.Redact, Personal: s.RedactPersonal, Kinds: s.RedactKinds,
-		Words: s.RedactWords, WordsAnyCase: s.RedactWordsAnyCase, WordsWhole: s.RedactWordsWhole,
-		Rules: s.RedactRules, Actions: s.RedactActions, Allow: s.RedactAllow, Shape: s.RedactShape}
-}
-
-// Scrubbing is what kept text — the request archive, the OTLP bodies and
-// gateway conversations — takes out: every secret, the user's words and
-// personal data by their own switches, and their rules while secrets are
-// masked for a vendor.
-func (s Settings) Scrubbing() redact.Options {
-	o := redact.Options{Secrets: true, Personal: s.RedactPersonal, Kinds: s.RedactKinds,
-		Words: s.RedactWords, WordsAnyCase: s.RedactWordsAnyCase, WordsWhole: s.RedactWordsWhole}
-	if s.Redact {
-		o.Rules = s.RedactRules
-	}
-	return o
-}
-
 // WorkingWindow is the context window Codex and Claude Code are told for a
 // model with a larger one, unless FullContext: Codex's own for OpenAI's
 // models that can take more.
@@ -1904,6 +1890,7 @@ func (s *Settings) KeepOwn(cur Settings) {
 	s.QuotaReads = cur.QuotaReads
 	s.NoAccountDiscovery = cur.NoAccountDiscovery
 	s.LAN, s.AllowIPs, s.MTLS, s.HTTPS = cur.LAN, cur.AllowIPs, cur.MTLS, cur.HTTPS
+	s.M365, s.M365KeyID = cur.M365, cur.M365KeyID
 	s.DesktopGateway = cur.DesktopGateway // an address of this computer
 	s.RouterNote, s.RouterAllTools, s.RouterNoCode = cur.RouterNote, cur.RouterAllTools, cur.RouterNoCode
 	s.Name = cur.Name // what this magpie is called

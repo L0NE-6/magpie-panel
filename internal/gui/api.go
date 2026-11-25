@@ -453,6 +453,12 @@ type settingsJSON struct {
 	// PanelKeys is whether the quick panel's shortcut can be set here
 	// (panelkey.go)
 	PanelKeys panelKeysJSON `json:"panelKeys"`
+	// Claude for Microsoft 365 uses a separate loopback HTTPS listener.
+	// The key is shown only masked; the explicit copy route returns it.
+	M365                   gateway.M365Status `json:"m365Status"`
+	M365KeyName            string             `json:"m365KeyName,omitempty"`
+	M365KeyMasked          string             `json:"m365KeyMasked,omitempty"`
+	M365CertificateActions bool               `json:"m365CertificateActions"`
 	// JSRoutings are the routings JS gateway plugins serve now
 	// ("<plugin>/<name>"), for the routing pickers
 	JSRoutings []middleware.Routing `json:"jsRoutings"`
@@ -894,6 +900,7 @@ func settingsState() settingsJSON {
 	s.Log = tilde(applog.Current())
 	s.Builtins = builtinsState()
 	s.PanelKeys = panelKeysState()
+	s.M365, s.M365KeyName, s.M365KeyMasked, s.M365CertificateActions = m365State()
 	s.JSRoutings = middleware.Routings()
 	s.OnNetwork = gateway.OnNetwork()
 	if list, env := gateway.AllowIPs(); env {
@@ -1010,11 +1017,38 @@ func settingsState() settingsJSON {
 	}
 	searchState(&s)
 	s.ImageGenAuto, s.ImageGenModels, s.ImageGenMissing = gateway.AutoDrawer(), []modelRef{}, gateway.DrawerMissing()
-	for _, m := range settingsapi.ImageGenModels(s.ImageGen) {
-		s.ImageGenModels = append(s.ImageGenModels, modelRef{
-			ID: m.ID, Name: m.Name, Provider: m.Provider, PName: m.ProviderName,
-			Icon: m.Icon, VendorPicks: m.VendorPicks,
-		})
+	for _, p := range provider.All() {
+		if !p.On() || p.DecideOnly() {
+			continue
+		}
+		// those unticked in its editor left out, but the one picked here
+		// (321sssrt on X): a hidden pick still draws, and shows as picked
+		for _, m := range gateway.Drawers(p) {
+			if p.DrawerHidden(m.ID) && gateway.ListedDrawer(s.ImageGen) != p.ID+"/"+m.ID {
+				continue
+			}
+			name := m.Name
+			if name == "" {
+				name = m.ID
+			}
+			s.ImageGenModels = append(s.ImageGenModels, modelRef{ID: p.ID + "/" + m.ID, Name: name, Provider: p.ID, PName: p.Name, Icon: p.Icon, VendorPicks: gateway.VendorPicksDrawer(p)})
+		}
+	}
+	// the routing groups with a member that draws (7up6666 on X): a
+	// group picked here draws on its members in its routing's order. One
+	// of image models only isn't served to agents (jzw690 on X), so it is
+	// listed from the groups themselves
+	listed := map[string]bool{}
+	for _, e := range provider.Served() {
+		if e.Group != "" && gateway.GroupDraws(e.ID) {
+			listed[e.ID] = true
+			s.ImageGenModels = append(s.ImageGenModels, modelRef{ID: e.ID, Name: e.Name, PName: e.Group})
+		}
+	}
+	for _, g := range provider.Groups() {
+		if ref := g.Ref(); !g.Hidden && !g.Disabled && !listed[ref] && gateway.GroupDraws(ref) {
+			s.ImageGenModels = append(s.ImageGenModels, modelRef{ID: ref, Name: cmp.Or(g.Name, g.ID), PName: g.ID})
+		}
 	}
 	if v := gateway.ListedDrawer(s.ImageGen); v != s.ImageGen {
 		s.ImageGenShown = v
@@ -2188,13 +2222,13 @@ func Handler(w Windows, gw *gateway.Server) http.Handler {
 			return
 		}
 		v := strings.TrimSpace(in.Model)
-		s := settings.Load()
-		if v != "" && v != "off" && v != s.CodexDescriptions {
-			if !settingsapi.ModelServed(v) {
+		if v != "" && v != "off" {
+			if _, _, ok := provider.Resolve(v); !ok {
 				fail(rw, fmt.Errorf("no model %s to write Codex's descriptions", v))
 				return
 			}
 		}
+		s := settings.Load()
 		s.CodexDescriptions = v
 		if err := settings.Save(s); err != nil {
 			fail(rw, err)
@@ -2211,13 +2245,13 @@ func Handler(w Windows, gw *gateway.Server) http.Handler {
 			return
 		}
 		v := strings.TrimSpace(in.Model)
-		s := settings.Load()
-		if v != "" && v != "off" && v != s.CodexPredictions {
-			if !settingsapi.ModelServed(v) {
+		if v != "" && v != "off" {
+			if _, _, ok := provider.Resolve(v); !ok {
 				fail(rw, fmt.Errorf("no model %s to write Codex's composer predictions", v))
 				return
 			}
 		}
+		s := settings.Load()
 		s.CodexPredictions = v
 		if err := settings.Save(s); err != nil {
 			fail(rw, err)
@@ -2277,13 +2311,13 @@ func Handler(w Windows, gw *gateway.Server) http.Handler {
 			return
 		}
 		v := strings.TrimSpace(in.Model)
-		s := settings.Load()
-		if v != "" && v != "off" && v != s.CodexTitles {
-			if !settingsapi.ModelServed(v) {
+		if v != "" && v != "off" {
+			if _, _, ok := provider.Resolve(v); !ok {
 				fail(rw, fmt.Errorf("no model %s to write Codex's titles", v))
 				return
 			}
 		}
+		s := settings.Load()
 		s.CodexTitles = v
 		if err := settings.Save(s); err != nil {
 			fail(rw, err)
@@ -2326,7 +2360,7 @@ func Handler(w Windows, gw *gateway.Server) http.Handler {
 			// Resolve intentionally accepts arbitrary names under a known
 			// provider. An approval reviewer must be a model or group magpie
 			// actually lists, including providers kept unlisted for routing.
-			if !settingsapi.ModelServed(v) {
+			if !slices.ContainsFunc(provider.Served(), func(e provider.Entry) bool { return e.ID == v || e.Group != "" && provider.SameRef(e.ID, v) }) {
 				fail(rw, fmt.Errorf("no model %s for Codex's auto-review", v))
 				return
 			}
@@ -2863,6 +2897,13 @@ func Handler(w Windows, gw *gateway.Server) http.Handler {
 			return
 		}
 		s := settings.Load()
+		if s.M365 {
+			if !slices.Contains(origins, gateway.M365Origin) {
+				origins = append(origins, gateway.M365Origin)
+			}
+		} else {
+			origins = slices.DeleteFunc(origins, func(origin string) bool { return origin == gateway.M365Origin })
+		}
 		s.CORSOrigins = origins
 		if err := settings.Save(s); err != nil {
 			fail(rw, err)
@@ -2870,6 +2911,7 @@ func Handler(w Windows, gw *gateway.Server) http.Handler {
 		}
 		writeJSON(rw, settingsState())
 	})
+	m365Routes(mux)
 	// the allow list (lc on Discord): the addresses other computers may
 	// reach magpie from, as IPs and CIDR ranges; none lets every address in.
 	// One that would shut out the page saving it (magpie web, opened from

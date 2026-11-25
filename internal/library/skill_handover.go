@@ -99,6 +99,11 @@ func readsSharedHere(ts []*Target) []string {
 // handOver hands one skill over (HandOverSkills). left says what of the
 // original couldn't be taken away after a whole copy was made.
 func handOver(l *Library, found *[]FoundSkill, ts []*Target, name string) (left string, err error) {
+	if sharedIsLibrary() {
+		// The skill is in the library already. Taking it out of the
+		// shared path would take the library's own entry with it.
+		return "", fmt.Errorf("%s is the library's own folder, so %s can't be handed over from it", sharedSkillsDir(), name)
+	}
 	sh := realDir(sharedSkillsDir())
 	if l.skill(name) == nil {
 		if *found == nil {
@@ -253,6 +258,12 @@ func HandBackSkill(name string) (*Result, error) {
 		s := l.skill(name)
 		if s == nil {
 			return fmt.Errorf("no skill called %s", name)
+		}
+		if sharedIsLibrary() {
+			// The skill is already at the destination. Moving its
+			// folder onto the same path would remove the library's
+			// own entry.
+			return fmt.Errorf("%s is the library's own folder, so %s can't be handed back into it", sharedSkillsDir(), name)
 		}
 		lib := skillDir(name)
 		if linked(lib) {

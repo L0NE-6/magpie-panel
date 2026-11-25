@@ -13,6 +13,15 @@ and billion-context's plugin, which folds a long session's older turns into
 summaries the model can open again, and lists, switches and copies each
 Pi's extensions and packages.
 
+When `~/.agents/skills` resolves to the library's own skills folder, or one
+contains the other, the shared folder is the library itself
+(`sharedIsLibrary`). `sharedEntry` and `readSharedOwn` then return none,
+`keepsShared` makes no link onto itself, and hand-over and hand-back refuse
+instead of taking a library entry away. Agents that read the alias still get
+exactly the skills ticked for them in their own folders
+(`TestSharedFolderIsTheLibrarysOwn`, `TestHandOverIntoItsOwnFolder`,
+`TestSharedIsLibraryThroughJunction`).
+
 ## Responsibilities and sources of truth
 
 | Part | Responsibility | Source |

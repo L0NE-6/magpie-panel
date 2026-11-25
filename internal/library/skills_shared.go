@@ -41,10 +41,21 @@ func SetSkillsWhere(where string) (*Result, error) {
 	})
 }
 
+// sharedIsLibrary is whether ~/.agents/skills is the library's own skills
+// folder, inside it, or holds it. Another skill manager can point its
+// shared-folder link at the library, making every entry there the
+// library's own rather than one the user keeps elsewhere.
+func sharedIsLibrary() bool {
+	shared, lib := realDir(sharedSkillsDir()), realDir(skillsDir())
+	return within(shared, lib) || within(lib, shared)
+}
+
 // keepsShared is whether the library puts its skill s in ~/.agents/skills:
 // the setting is on, the skill is on here and its folder is there.
 func (l *Library) keepsShared(s *Skill) bool {
-	if !l.SharedSkills || s == nil || s.OffHere {
+	if !l.SharedSkills || s == nil || s.OffHere || sharedIsLibrary() {
+		// The shared folder is already the library's own: linking a
+		// library skill there would make the entry point at itself.
 		return false
 	}
 	_, err := os.Stat(filepath.Join(skillDir(s.Name), "SKILL.md"))

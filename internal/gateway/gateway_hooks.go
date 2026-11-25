@@ -51,9 +51,10 @@ func gatewayReply(proto provider.Protocol, body []byte) (json.RawMessage, error)
 	}
 	var c collector
 	var completed json.RawMessage
+	items := map[int]json.RawMessage{}
 	decode := decoder(proto)
 	ended := false
-	err := readSSE(bytes.NewReader(body), func(_ string, data string) error {
+	err := readSSE(bytes.NewReader(body), func(event string, data string) error {
 		if data == "[DONE]" {
 			ended = true
 			return nil
@@ -63,11 +64,39 @@ func gatewayReply(proto provider.Protocol, body []byte) (json.RawMessage, error)
 		}
 		if proto == provider.Responses {
 			var e struct {
-				Type     string          `json:"type"`
-				Response json.RawMessage `json:"response"`
+				Type        string          `json:"type"`
+				Response    json.RawMessage `json:"response"`
+				Item        json.RawMessage `json:"item"`
+				OutputIndex int             `json:"output_index"`
 			}
-			if json.Unmarshal([]byte(data), &e) == nil && e.Type == "response.completed" && len(e.Response) > 0 {
-				completed = e.Response
+			if json.Unmarshal([]byte(data), &e) == nil {
+				// the type may be written only on the event: line; the
+				// decoder reads it from the data
+				if e.Type == "" {
+					e.Type = event
+					var m map[string]json.RawMessage
+					if json.Unmarshal([]byte(data), &m) == nil && m != nil {
+						m["type"] = json.RawMessage(`"` + event + `"`)
+						if b, err := json.Marshal(m); err == nil {
+							data = string(b)
+						}
+					}
+				}
+				switch e.Type {
+				case "response.completed", "response.incomplete":
+					// an incomplete stream still ended: its response is the
+					// reply, and the hook reads the status (#7760)
+					if len(e.Response) > 0 {
+						completed = e.Response
+						ended = true
+					}
+				case "response.output_item.done":
+					// the output the client got, for a completed response
+					// that names none (#7760)
+					if len(e.Item) > 0 {
+						items[e.OutputIndex] = e.Item
+					}
+				}
 			}
 		}
 		return decode(data, func(e Event) {
@@ -87,7 +116,7 @@ func gatewayReply(proto provider.Protocol, body []byte) (json.RawMessage, error)
 		return nil, errors.New(c.err)
 	}
 	if completed != nil {
-		return completed, nil
+		return withStreamedOutput(completed, items), nil
 	}
 	res := c.finish()
 	return render(proto, res, &Request{Model: res.Model}), nil

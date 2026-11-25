@@ -191,7 +191,11 @@ eleven seconds); each callback uses the configured bounded hook timeout. Request
   with every earlier copy of one; the latest user message's are kept, and
   a request with no cap or within it goes as the same bytes. Session files are never touched.
 - `internal/gateway/gateway_hooks.go`: bounded response observation and
-  `gatewayReply`, a stream made one reply.
+  `gatewayReply`, a stream made one reply. A Responses stream's
+  `response.completed` or `response.incomplete` is that reply, with the
+  stream's `output_item.done` items filled in when its own `output` is
+  empty, and an event type written only on the `event:` line is read
+  (#7760, `gateway_hooks_reply_test.go`).
 - `internal/gateway/signin_hooks.go`: sign-in events, and
   `internal/plugin/gateway.go`'s `GatewaySignIn` and host.js's
   `gatewaySignIn` that deliver them.

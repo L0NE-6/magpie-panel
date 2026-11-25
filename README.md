@@ -1,3 +1,11 @@
+> [!IMPORTANT]
+> **Public maintenance fork**
+>
+> This is an unofficial maintenance fork of
+> [`yetone/magpie`](https://github.com/yetone/magpie). Upstream remains the
+> source of truth for the application, releases and production installs.
+> This fork adds issue/PR triage, reproducible patches and a maintenance
+> dashboard. Start with [`PANEL.md`](PANEL.md).
 <div align="center">
 
 <a href="https://usemagpie.ai"><img src="site/public/img/icon-256.png" width="112" alt="magpie"></a>

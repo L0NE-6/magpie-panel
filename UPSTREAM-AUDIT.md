@@ -29,6 +29,12 @@ the shared session listing and transcript switches.
 | [#7723](https://github.com/yetone/magpie/issues/7723) | Integrated in panel as `23542477`, with follow-up `58545de7` | Shape stand-ins are restored, held across SSE chunks and excluded from other masks only as whole names. The follow-up keeps case-folded username stand-ins visible at stream boundaries. The full `internal/redact` suite and `go vet -tags nogui ./internal/redact` pass. The separate process-global stand-in table isolation concern from the issue discussion remains open. |
 | [#7744](https://github.com/yetone/magpie/issues/7744) | Integrated in panel as `0002112c` | `mcpProxy` flushes `text/event-stream` response headers immediately after `WriteHeader`, so a silent standalone GET no longer blocks MCP initialization. The direct and restricted-key regression tests pass, and the focused race run passes 20 iterations. |
 
+## High-Risk Open Issues
+
+| Issue | Current state | Evidence boundary |
+| :--- | :--- | :--- |
+| [#7438](https://github.com/yetone/magpie/issues/7438) | Open; no deterministic reproduction or patch | Static audits found no deletion path in the update apply flow or the resident plugin JavaScript. The update swap is two file renames and the idle transition performs no filesystem cleanup. The remaining suspects are the external `agy` 1.5.14 artifact, whose fingerprint is no longer retrievable, and a machine-local idle-triggered action outside the captured USN window. Sysmon is now installed on the reporter's machine. Do not mark this fixed without a process-level reproduction. |
+
 ## Open Pull Requests
 
 | PR | Current state | Maintenance note |

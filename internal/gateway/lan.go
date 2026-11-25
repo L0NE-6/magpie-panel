@@ -40,6 +40,10 @@ func listenAddr() string {
 	return Addr()
 }
 
+// ListenAddr is the address the gateway binds, including every interface
+// when sharing widens it. It is the address a listener lookup must match.
+func ListenAddr() string { return listenAddr() }
+
 // pinnedHost is the host MAGPIE_ADDR names, "" when it isn't set or names
 // every interface (0.0.0.0, ::, or no host).
 func pinnedHost() string {

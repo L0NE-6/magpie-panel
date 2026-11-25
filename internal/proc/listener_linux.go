@@ -9,10 +9,10 @@ import (
 	"strings"
 )
 
-// listeningOn reads /proc: the listening sockets on port from
+// listeningOn reads /proc: the listening sockets on target from
 // /proc/net/tcp and tcp6, then the processes holding them, among those
 // whose descriptors this user may read.
-func listeningOn(ctx context.Context, port int) ([]int, error) {
+func listeningOn(ctx context.Context, target listenTarget) ([]int, error) {
 	inodes := map[string]bool{}
 	read := false
 	for _, f := range []string{"/proc/net/tcp", "/proc/net/tcp6"} {
@@ -21,7 +21,7 @@ func listeningOn(ctx context.Context, port int) ([]int, error) {
 			continue
 		}
 		read = true
-		for k := range listenInodes(string(b), port) {
+		for k := range listenInodes(string(b), target) {
 			inodes[k] = true
 		}
 	}
@@ -57,23 +57,6 @@ func listeningOn(ctx context.Context, port int) ([]int, error) {
 		}
 	}
 	return ps, nil
-}
-
-// listenInodes are the inodes of the sockets listening (st 0A) on port in
-// a /proc/net/tcp table.
-func listenInodes(table string, port int) map[string]bool {
-	out := map[string]bool{}
-	want := fmt.Sprintf(":%04X", port)
-	for _, l := range strings.Split(table, "\n")[1:] {
-		f := strings.Fields(l)
-		if len(f) < 10 || f[3] != "0A" || !strings.HasSuffix(strings.ToUpper(f[1]), want) {
-			continue
-		}
-		if f[9] != "0" {
-			out[f[9]] = true
-		}
-	}
-	return out
 }
 
 func executable(pid int) (string, error) {

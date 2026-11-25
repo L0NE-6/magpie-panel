@@ -38,11 +38,10 @@ var portFree = func(addr string) error {
 // a magpie inside a container (OrbStack Helper, docker-proxy) or none this
 // user can see; when the processes can't be listed at all, it is taken to
 // be one.
-func magpieOnPort(port string) bool {
-	n, _ := strconv.Atoi(port)
+func magpieOnAddr(addr string) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	pids, err := proc.ListeningOn(ctx, n)
+	pids, err := proc.ListeningOnAddr(ctx, addr)
 	if err != nil {
 		return true
 	}
@@ -95,7 +94,7 @@ func setPort(p int) (portJSON, error) {
 		return portJSON{Port: want}, nil
 	}
 	gw := served.Load()
-	if gw == nil && gateway.Running() && magpieOnPort(gateway.Port()) {
+	if gw == nil && gateway.Running() && magpieOnAddr(gateway.ListenAddr()) {
 		return portJSON{}, fmt.Errorf("another magpie serves the gateway at %s: set its port there, or quit it first", gateway.URL())
 	}
 	host := "127.0.0.1"

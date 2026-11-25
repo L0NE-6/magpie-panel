@@ -9,29 +9,22 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// listeningOn asks Get-NetTCPConnection, which names each listener's owner.
+// listeningOn asks Get-NetTCPConnection, which names each listener's owner
+// and local address.
 // When nothing listens the cmdlet fails with ObjectNotFound, and with
 // -ErrorAction SilentlyContinue PowerShell still exits 1 for it, so a port
 // nobody holds read as an error and a take-over waited for the older
 // magpie's port to be let go until it said "stuck" (#2231). That one
 // failure is no listener, as lsof and /proc say it; any other failure, or
 // a PowerShell cut short, is still an error.
-func listeningOn(ctx context.Context, port int) ([]int, error) {
+func listeningOn(ctx context.Context, target listenTarget) ([]int, error) {
 	out, err := CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command",
-		`try { Get-NetTCPConnection -State Listen -LocalPort `+strconv.Itoa(port)+` -ErrorAction Stop | ForEach-Object { $_.OwningProcess } } `+
+		`try { Get-NetTCPConnection -State Listen -LocalPort `+strconv.Itoa(target.port)+` -ErrorAction Stop | ForEach-Object { "{0}|{1}" -f $_.OwningProcess, $_.LocalAddress } } `+
 			`catch { if ($_.CategoryInfo.Category -eq 'ObjectNotFound') { exit 0 }; [Console]::Error.WriteLine($_); exit 1 }`).Output()
 	if err != nil {
 		return nil, err
 	}
-	var ps []int
-	seen := map[int]bool{}
-	for _, l := range strings.Fields(string(out)) {
-		if n, err := strconv.Atoi(l); err == nil && n > 0 && !seen[n] {
-			seen[n] = true
-			ps = append(ps, n)
-		}
-	}
-	return ps, nil
+	return pidsMatching(windowsListeners(string(out), target.port), target), nil
 }
 
 func executable(pid int) (string, error) {

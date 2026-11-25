@@ -29,6 +29,16 @@ type Holder struct {
 // an unreadable holder is unknown, never "none".
 func PortHolder(ctx context.Context, port int) (Holder, bool) {
 	pids, err := ListeningOn(ctx, port)
+	return holderOf(pids, err)
+}
+
+// PortHolderAddr is PortHolder for one local address.
+func PortHolderAddr(ctx context.Context, addr string) (Holder, bool) {
+	pids, err := ListeningOnAddr(ctx, addr)
+	return holderOf(pids, err)
+}
+
+func holderOf(pids []int, err error) (Holder, bool) {
 	if err != nil {
 		return Holder{}, false
 	}

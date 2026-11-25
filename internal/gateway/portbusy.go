@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -41,7 +42,7 @@ type PortHeld struct {
 
 // readHolder and readServes are the system readers, vars for the tests.
 var (
-	readHolder = proc.PortHolder
+	readHolder = proc.PortHolderAddr
 	readServes = proc.TailscaleServes
 	readOwn    = ownMagpie
 )
@@ -92,7 +93,7 @@ func ClearHeld() { lastHeld.Store(nil) }
 func NoteHeld() (PortHeld, bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
-	b, ok := whoHolds(ctx, Port(), readHolder, readServes)
+	b, ok := whoHolds(ctx, listenAddr(), readHolder, readServes)
 	if !ok {
 		ClearHeld()
 		return b, false
@@ -102,15 +103,19 @@ func NoteHeld() (PortHeld, bool) {
 }
 
 // whoHolds, with the readers given for the tests.
-func whoHolds(ctx context.Context, port string,
-	holder func(context.Context, int) (proc.Holder, bool),
+func whoHolds(ctx context.Context, addr string,
+	holder func(context.Context, string) (proc.Holder, bool),
 	serves func(context.Context, int) bool) (PortHeld, bool) {
+	_, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return PortHeld{}, false
+	}
 	n, err := strconv.Atoi(port)
 	if err != nil {
 		return PortHeld{}, false
 	}
 	b := PortHeld{Port: port}
-	if h, ok := holder(ctx, n); ok {
+	if h, ok := holder(ctx, addr); ok {
 		b.Name, b.PID, b.Path = h.Name, h.PID, h.Path
 		b.Tailscale = h.IsTailscale()
 		b.Own = !b.Tailscale && readOwn(h)

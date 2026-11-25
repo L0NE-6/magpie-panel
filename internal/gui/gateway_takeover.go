@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"slices"
-	"strconv"
 	"time"
 
 	"github.com/yetone/magpie/internal/gateway"
@@ -128,10 +127,9 @@ func startHere() gatewayFixJSON {
 	if o := gateway.ServedBy(); o.Running {
 		out.Version = o.Version
 	}
-	port, _ := strconv.Atoi(out.Port)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if pids, err := proc.ListeningOn(ctx, port); err == nil {
+	if pids, err := proc.ListeningOnAddr(ctx, gateway.ListenAddr()); err == nil {
 		for _, pid := range pids {
 			if pid == os.Getpid() {
 				continue
@@ -170,11 +168,10 @@ func startHere() gatewayFixJSON {
 // waits until the port is let go.
 func quitMagpieOnPort(version string) gatewayFixJSON {
 	port := gateway.Port()
-	n, _ := strconv.Atoi(port)
 	out := gatewayFixJSON{Port: port, Version: version}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	pids, err := proc.ListeningOn(ctx, n)
+	pids, err := proc.ListeningOnAddr(ctx, gateway.ListenAddr())
 	if err != nil {
 		out.Reason, out.Error = "error", err.Error()
 		return out
@@ -218,23 +215,23 @@ func quitMagpieOnPort(version string) gatewayFixJSON {
 	if bad := end(proc.Terminate); bad != nil {
 		return *bad
 	}
-	if letGo(ctx, n, pids, quitWait) {
+	if letGo(ctx, gateway.ListenAddr(), pids, quitWait) {
 		return gatewayFixJSON{OK: true}
 	}
 	if bad := end(proc.Kill); bad != nil {
 		return *bad
 	}
-	if letGo(ctx, n, pids, killWait) {
+	if letGo(ctx, gateway.ListenAddr(), pids, killWait) {
 		return gatewayFixJSON{OK: true}
 	}
 	out.Reason = "stuck"
 	return out
 }
 
-// letGo waits until none of pids listens on port.
-func letGo(ctx context.Context, port int, pids []int, wait time.Duration) bool {
+// letGo waits until none of pids listens on addr.
+func letGo(ctx context.Context, addr string, pids []int, wait time.Duration) bool {
 	for deadline := time.Now().Add(wait); ; time.Sleep(100 * time.Millisecond) {
-		now, err := proc.ListeningOn(ctx, port)
+		now, err := proc.ListeningOnAddr(ctx, addr)
 		if err == nil && !slices.ContainsFunc(now, func(p int) bool { return slices.Contains(pids, p) }) {
 			return true
 		}

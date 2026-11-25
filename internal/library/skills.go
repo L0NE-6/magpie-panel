@@ -816,10 +816,25 @@ func (l *Library) syncSkills(t *Target, res *Result, all []*Target) {
 		s := l.skill(name)
 		p := filepath.Join(t.Skills, name)
 		if l.blockedSkills[realDir(p)] {
-			mine = append(mine, name)
-			continue
+			fi, err := os.Lstat(p)
+			broken := err == nil && linkEntry(fi) && (s == nil || s.Dangling)
+			if !broken {
+				mine = append(mine, name)
+				continue
+			}
 		}
-		if wanted(s) && !inShared(s) && !routed[name] || !ours(p, name) {
+		owned := ours(p, name)
+		if !owned && (s == nil || s.Dangling) {
+			// A junction to a missing target cannot be read back on
+			// Windows, so ours cannot identify it. Applied still records
+			// that magpie wrote this entry; when its skill is gone or
+			// dangling, take the broken link out rather than keep a
+			// dangling path in the agent's folder (#6697).
+			if fi, err := os.Lstat(p); err == nil && linkEntry(fi) {
+				owned = true
+			}
+		}
+		if wanted(s) && !inShared(s) && !routed[name] || !owned {
 			continue
 		}
 		if err := unlink(p); err != nil {

@@ -112,7 +112,12 @@ func syncSteps(all, gone []*Target, b *backups, res *Result) []func(*Library) {
 	// a skill whose app moved it is followed first, for every agent to
 	// get the moved one (skill_moved.go)
 	// an edit made in a subagent's own file too (subagent_file.go)
-	steps := []func(*Library){func(l *Library) { l.followMovedSkills(); l.markDangling(); l.followSubagentFiles() }}
+	steps := []func(*Library){func(l *Library) {
+		l.followMovedSkills()
+		l.markDangling()
+		l.healMissingSkillEntries(res)
+		l.followSubagentFiles()
+	}}
 	for _, t := range all {
 		steps = append(steps, func(l *Library) {
 			if claudeCode(t) {
@@ -197,6 +202,10 @@ func Sync() (*Result, error) {
 		}
 		if memo != nil && mu.held == heldAt+1 {
 			l.hashes, l.untouched = memo.hashes, memo.untouched
+			l.dangling = memo.dangling
+			for _, s := range l.Skills {
+				s.Dangling = l.dangling[s.Name]
+			}
 		}
 		f(l)
 		if err := l.save(); err != nil {

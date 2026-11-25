@@ -126,6 +126,9 @@ type Library struct {
 	// blockedSkills are copies takeEdits couldn't scan, kept in place for
 	// this sync rather than replaced or removed. Keys are physical paths.
 	blockedSkills map[string]bool
+	// dangling carries Skill.Dangling across Sync's per-step reloads. It
+	// is set at the first step and applied after every later load.
+	dangling map[string]bool
 	// stored are the skills this sync made sure of in a WSL distro's
 	// store, by path (storeSkill), with what went wrong
 	stored map[string]error

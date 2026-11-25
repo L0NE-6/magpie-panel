@@ -17,7 +17,7 @@ workflow, and verified local integrations.
 | [#978](https://github.com/yetone/magpie/pull/978) | Conflicting / dirty | P2 Usage layout; needs narrow-screen and Playwright regression checks. |
 | [#1017](https://github.com/yetone/magpie/pull/1017) | Integrated in panel | Reimplemented for the current Usage architecture as `8a6b1c1`; Chromium regression tests pass, WebKit remains unverified. |
 | [#1020](https://github.com/yetone/magpie/pull/1020) | Integrated in panel | CI-only installed-font test integrated as `f81f1a4`; upstream remains open. |
-| [#1033](https://github.com/yetone/magpie/pull/1033) | Draft / conflicting | P2 Reasonix sessions; needs rebase, completeness tests, and a real binary check. |
+| [#1033](https://github.com/yetone/magpie/pull/1033) | Integrated in panel | Reasonix legacy transcripts, native ledgers and all four store codecs are integrated as `1884c552`, with compatibility and retained-usage UI. Focused sessions and GUI tests pass; the Python preview tools pass 13 tests. No live Reasonix installation was available. |
 | [#1072](https://github.com/yetone/magpie/pull/1072) | Conflicting / dirty | P2 library hash behavior; preserve old-hash compatibility. |
 | [#1073](https://github.com/yetone/magpie/pull/1073) | Integrated in panel | Reimplemented against the current Settings API as `b2ed15e`; focused Go tests and race checks pass. |
 | [#1074](https://github.com/yetone/magpie/pull/1074) | Integrated in panel | Archive and OTLP masking are unified as `4ecf1ef`; focused Go tests and cross-platform vet pass. The later panel merge dropped `Settings.Redaction`/`Scrubbing`, restored as `d1469ff0`. Real S3/collector verification remains pending. |

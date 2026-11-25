@@ -17,7 +17,7 @@ production installs.
 
 Live check on **2026-11-25**:
 
-- 5,106 open issues;
+- 5,110 open issues;
 - 16 open pull requests;
 - upstream `main` at `eab4b006`.
 

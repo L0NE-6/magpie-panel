@@ -5,9 +5,6 @@ This is an unofficial public maintenance fork of
 source of truth for the application, releases, provider contracts and
 production installs.
 
-See [UPSTREAM-AUDIT.md](UPSTREAM-AUDIT.md) for the current core issue and PR
-inventory.
-
 ## Scope
 
 - keep `main` as a fast-forward mirror of upstream `main`;
@@ -18,11 +15,11 @@ inventory.
 
 ## Snapshot
 
-At the time this branch was updated, upstream had approximately:
+Live check on **2026-11-25**:
 
 - 5,102 open issues;
 - 16 open pull requests;
-- active commits on `main`.
+- upstream `main` at `189ce66`.
 
 Counts are a snapshot and must be refreshed live.
 

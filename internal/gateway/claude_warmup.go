@@ -68,6 +68,7 @@ func askClaude(ctx context.Context, configDir, model string) error {
 	if err != nil {
 		return err
 	}
+	env = claudeCleanupEnv(env, filepath.Base(tmp))
 	cmd.Env = binary.env(env, configDir)
 	var out, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &stderr
@@ -111,6 +112,7 @@ func askClaudeTUI(ctx context.Context, binary claudeCLI, configDir, model string
 	if err != nil {
 		return err
 	}
+	env = claudeCleanupEnv(env, "magpie-claude-"+randomToken())
 	// the folder is magpie's own: asked whether to trust it, say yes
 	env = append(env, claudetui.TrustEnv+"=1")
 	env = append(env, claudeBypassEnv(true, configDir)...)
@@ -212,6 +214,7 @@ func claudeUsage(ctx context.Context, configDir string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	env = claudeCleanupEnv(env, filepath.Base(tmp))
 	cmd.Env = binary.env(env, configDir)
 	var out, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &stderr
@@ -564,7 +567,9 @@ func runClaudeTree(ctx context.Context, cmd *exec.Cmd, what string) error {
 	if err != nil {
 		return err
 	}
-	return t.Wait()
+	err = t.Wait()
+	claudeCleanup(claudeRunIDFromEnv(cmd.Env))
+	return err
 }
 
 // claudeRun is the result Claude Code prints for a -p run with

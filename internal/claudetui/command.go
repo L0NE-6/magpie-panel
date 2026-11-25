@@ -28,6 +28,10 @@ const BypassEnv = "MAGPIE_CLAUDE_TUI_BYPASS"
 // 1" on Windows (#4830).
 const DeadlineEnv = "MAGPIE_CLAUDE_TUI_BY"
 
+// RunIDEnv names the Claude Code run whose cleanup hook may need to cross
+// an exec boundary. It is passed through WSLENV to a Claude Code in WSL.
+const RunIDEnv = "MAGPIE_CLAUDE_RUN_ID"
+
 // Untrusted begins what the helper says, on its stderr, as it ends over a
 // folder it wasn't told to trust: the bridge then runs the turn in a
 // folder of magpie's.

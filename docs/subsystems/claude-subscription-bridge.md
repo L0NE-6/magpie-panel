@@ -1832,6 +1832,38 @@ tools) and `since`. It also gives `ends`, when its timer lets it go
 (`endIn` records it at each reset), and Claude Code's RSS. `live` is
 `claudeRoom`'s count, one-off asks included. `magpie claude-code runs`
 prints the list under the bound and says what the processes are.
+
+### Runs that cross an exec boundary (`MAGPIE_CLAUDE_KILL`)
+
+A host process group does not reach a workload behind `docker exec`, ssh,
+WSL or another exec boundary. Each run therefore gets
+`MAGPIE_CLAUDE_RUN_ID=magpie-claude-<n>`, the basename of its temporary
+directory, in Claude Code's environment. A wrapper can propagate that tag
+across its boundary, or use the run's existing temporary-directory path in
+its argv. The bridge's runs and one-off runs with their own temporary
+directory have the tag in that path; a one-off interactive run in the shared
+work directory needs its wrapper to propagate the environment.
+
+Set `MAGPIE_CLAUDE_KILL` in magpie's service environment to an optional
+shell command. After the run's host process tree ends, magpie runs it once
+with the same `MAGPIE_CLAUDE_RUN_ID`, waits up to 10 seconds, and writes its
+output and failure to `app.log`. The hook is removed from Claude Code's
+environment; only the run tag is passed through. For example, a
+long-lived container can be cleaned with:
+
+```sh
+export MAGPIE_CLAUDE_KILL='docker exec cell pkill -f "$MAGPIE_CLAUDE_RUN_ID"; test $? -le 1'
+```
+
+The trailing `test` treats `pkill`'s no-match status as a successful no-op.
+The hook runs after every run end, including a run that exits by itself, so
+it can also catch a workload that outlives a wrapper's successful return.
+
+`TestClaudeRunCleanupHookReachesDetachedProcess` starts a process in a new
+session, ends the host-side tree, and checks that the hook kills it using
+the run tag. `TestClaudeCleanupEnvTagsTheRunWithoutTheHook` checks that the
+command does not reach Claude Code.
+
 On 10-27, a sandbox `magpie serve` with a made-up Claude sign-in and real
 Claude Code 2.1.311 against a mock API got 8 concurrent subagent-like
 requests. It kept 6 Claude Code and 6 helpers, and the list named the same

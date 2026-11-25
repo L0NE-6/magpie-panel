@@ -191,10 +191,11 @@ type subscriptionRun struct {
 	// exited is closed once Claude Code has exited and its output is read,
 	// exit then how it ended (Wait's error); killed says magpie ended it
 	// (abort) while it ran
-	exited chan struct{}
-	exit   error
-	killed bool
-	tmp    string
+	exited      chan struct{}
+	exit        error
+	killed      bool
+	tmp         string
+	cleanupDone chan struct{}
 	// room frees the process's place in claudeRoom once it has exited,
 	// roomLeft telling it magpie ended it (abort)
 	room     func(left bool)
@@ -838,7 +839,7 @@ func (c claudeCLI) asRoot(env []string) []string {
 
 // claudeEnvVars are the variables magpie sets for a Claude Code run, which
 // one in WSL is handed (wslrun's Env).
-var claudeEnvVars = []string{"ENABLE_CLAUDEAI_MCP_SERVERS", "DISABLE_AUTO_COMPACT", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+var claudeEnvVars = []string{claudetui.RunIDEnv, "ENABLE_CLAUDEAI_MCP_SERVERS", "DISABLE_AUTO_COMPACT", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
 	"DISABLE_TELEMETRY", "DO_NOT_TRACK", "DISABLE_ERROR_REPORTING", "DISABLE_AUTOUPDATER", "ANTHROPIC_BETAS",
 	"CLAUDE_CODE_EXTRA_BODY", "DISABLE_PROMPT_CACHING", "CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS", "CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT"}
 
@@ -1061,6 +1062,7 @@ func (b *subscriptionBridge) startRun(ctx context.Context, req *Request, model, 
 	if err != nil {
 		return nil, nil, err
 	}
+	runID := filepath.Base(tmp)
 	cleanup := func() { _ = os.RemoveAll(tmp) }
 
 	tools := bridgeTools(req)
@@ -1330,6 +1332,7 @@ func (b *subscriptionBridge) startRun(ctx context.Context, req *Request, model, 
 		cleanup()
 		return nil, nil, err
 	}
+	env = claudeCleanupEnv(env, runID)
 	if req.clientCache != nil && !tui {
 		// the client's marks take the place of Claude Code's own; the
 		// interactive mode is pasted the words without them, and keeps
@@ -6913,8 +6916,9 @@ func (r *subscriptionRun) launch() error {
 		return err
 	}
 	exited := make(chan struct{})
+	cleanupDone := make(chan struct{})
 	r.mu.Lock()
-	r.tree, r.exited = t, exited
+	r.tree, r.exited, r.cleanupDone = t, exited, cleanupDone
 	r.mu.Unlock()
 	started := time.Now()
 	mode := "claude -p"
@@ -6924,6 +6928,8 @@ func (r *subscriptionRun) launch() error {
 	log.Printf("claude: Claude Code pid %d started, a run on %s (%s)", r.pid(), r.model, mode)
 	go func() {
 		err := t.Wait()
+		r.runCleanup()
+		close(cleanupDone)
 		how := "exited"
 		if err != nil {
 			how = err.Error()
@@ -7132,10 +7138,11 @@ const stopGrace = 5 * time.Second
 
 // abort ends the run: Claude Code is asked to end (proc.Tree.Stop) and its
 // tree killed if it hasn't within stopGrace. The run counts as ended at
-// once. The channel closes once the tree is.
+// once. The channel closes once the tree and its cleanup hook are.
 func (r *subscriptionRun) abort() <-chan struct{} {
 	r.mu.Lock()
 	t := r.tree
+	cleanupDone := r.cleanupDone
 	if t != nil && r.exited != nil {
 		select {
 		case <-r.exited:
@@ -7154,6 +7161,9 @@ func (r *subscriptionRun) abort() <-chan struct{} {
 		stopped = t.Stop(stopGrace)
 	}
 	r.finish()
+	if cleanupDone != nil {
+		stopped = waitForCleanup(stopped, cleanupDone)
+	}
 	return stopped
 }
 

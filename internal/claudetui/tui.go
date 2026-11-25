@@ -286,6 +286,9 @@ func childEnv(extra ...string) []string {
 	}
 	if os.Getenv(WSLEnv) != "" {
 		pass := os.Getenv("WSLENV") + ":TERM"
+		if os.Getenv(RunIDEnv) != "" {
+			pass += ":" + RunIDEnv
+		}
 		for _, x := range extra {
 			k, _, _ := strings.Cut(x, "=")
 			pass += ":" + k

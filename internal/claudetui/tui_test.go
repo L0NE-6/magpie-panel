@@ -1327,6 +1327,7 @@ func TestShimInWSL(t *testing.T) {
 	}
 	t.Setenv(WSLEnv, `{"args":["-d","Ubuntu"],"projects":"x"}`)
 	t.Setenv("WSLENV", "CLAUDE_CONFIG_DIR/p")
+	t.Setenv(RunIDEnv, "magpie-claude-7747")
 	env := childEnv()
 	var wslenv []string
 	for _, e := range env {
@@ -1337,7 +1338,7 @@ func TestShimInWSL(t *testing.T) {
 			wslenv = append(wslenv, e)
 		}
 	}
-	if len(wslenv) != 1 || wslenv[0] != "WSLENV=CLAUDE_CONFIG_DIR/p:TERM" {
+	if len(wslenv) != 1 || wslenv[0] != "WSLENV=CLAUDE_CONFIG_DIR/p:TERM:"+RunIDEnv {
 		t.Fatalf("WSLENV %q", wslenv)
 	}
 	// the tap's go through WSLENV too, in place of the shim's own
@@ -1349,7 +1350,7 @@ func TestShimInWSL(t *testing.T) {
 			bun = append(bun, e)
 		}
 	}
-	if want := []string{"WSLENV=CLAUDE_CONFIG_DIR/p:TERM:BUN_OPTIONS:" + tapEnv, "BUN_OPTIONS=--preload /mnt/c/t/tap.js", tapEnv + "=/mnt/c/t/tap.jsonl"}; !slices.Equal(bun, want) {
+	if want := []string{"WSLENV=CLAUDE_CONFIG_DIR/p:TERM:" + RunIDEnv + ":BUN_OPTIONS:" + tapEnv, "BUN_OPTIONS=--preload /mnt/c/t/tap.js", tapEnv + "=/mnt/c/t/tap.jsonl"}; !slices.Equal(bun, want) {
 		t.Fatalf("env %q, want %q", bun, want)
 	}
 }

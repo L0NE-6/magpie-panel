@@ -571,10 +571,35 @@ func (a *Account) pluginLists(model string) bool {
 	}
 	for _, ac := range pp.Accounts {
 		if ac.Key == a.pluginKey && toldList(ac) != nil {
-			return slices.Contains(ac.Models, model)
+			if slices.Contains(ac.Models, model) {
+				return true
+			}
+			// agy-cli lists the effort variants agy itself names
+			// (`gemini-4-argon-high`), while Magpie routes the family id
+			// (`gemini-4-argon`). Compare the family too, in either
+			// direction, so the own account is not left out of the only
+			// account that serves the model (#7748).
+			if pp.ID == agyCLIID || pp.ID == "antigravity" {
+				family := pluginModelFamily(model)
+				return slices.ContainsFunc(ac.Models, func(id string) bool {
+					return pluginModelFamily(id) == family
+				})
+			}
+			return false
 		}
 	}
 	return true
+}
+
+// pluginModelFamily is a model id without one of the effort suffixes
+// agy-cli and Antigravity put on their raw variants.
+func pluginModelFamily(model string) string {
+	for _, suffix := range []string{"minimal", "low", "medium", "high", "xhigh", "max", "thinking", "fast"} {
+		if strings.HasSuffix(model, "-"+suffix) {
+			return strings.TrimSuffix(model, "-"+suffix)
+		}
+	}
+	return model
 }
 
 // pluginProvider is the provider as one of its accounts, l as the

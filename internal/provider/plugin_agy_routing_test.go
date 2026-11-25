@@ -3,76 +3,140 @@ package provider
 import (
 	"encoding/json"
 	"os"
-	"strings"
+	"path/filepath"
+	"slices"
 	"testing"
-	"time"
 
 	"github.com/yetone/magpie/internal/plugin"
+	"github.com/yetone/magpie/internal/settings"
 )
 
-// will930128 on X: in an Opus 5.5 routing group the agy-cli account's
-// share showed as not known, last behind every account known, while its
-// card showed Claude & GPT's 5 hours and 7 days. agy-cli 0.1.114 set every
-// window aside, so routing had none to weigh the account by and
-// Allowances left it out. 0.1.115 sends each model's own window as the
-// retired Antigravity plugin did: routing reads Opus 5.5 by Claude &
-// GPT's share, and the pool's windows (still aside) hold it at a cap. The
-// fixture is agy-cli 0.1.115's parseUsageReport of agy's live /usage
-// report of 11-15 and its `agy models` rows; its resets are moved ahead
-// of now, so none has passed.
-func TestAgyCLIRoutedByItsModelsWindows(t *testing.T) {
-	raw, err := os.ReadFile("testdata/agy-cli-0.1.115-usage.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	now := time.Now()
-	week := now.Add(4 * 24 * time.Hour).UTC().Format(time.RFC3339)
-	five := now.Add(3 * time.Hour).UTC().Format(time.RFC3339)
-	for _, old := range []string{"2026-11-20T09:01:10.000Z", "2026-11-22T11:19:33.000Z"} {
-		raw = []byte(strings.ReplaceAll(string(raw), old, week))
-	}
-	raw = []byte(strings.ReplaceAll(string(raw), "2026-11-15T16:19:33.000Z", five))
-	var u plugin.Usage
-	if err := json.Unmarshal(raw, &u); err != nil {
-		t.Fatal(err)
-	}
-	read := func(u plugin.Usage) SubscriptionQuota {
-		return quotaOfPlugin(SubscriptionQuota{Provider: PluginID("agy-cli"), User: "a@gmail.com"}, u)
-	}
-
-	a, ok := routedAllowance("plugin:agy-cli", "a@gmail.com", read(u), now)
-	if !ok {
-		t.Fatal("routing has no allowance for the account its card shows")
-	}
-	for model, want := range map[string]float64{
-		"claude-opus-5-5":        66.394961, // Claude & GPT's 7 days
-		"claude-opus-5-5-high":   66.394961, // an effort level of it
-		"gpt-oss-120b-medium":    66.394961,
-		"gemini-4-hydrogen-high": 0,
-		"gemini-4-argon":         0,
-	} {
-		used, renews := a.For(model, now)
-		if used != want || len(renews) == 0 || renews[0].IsZero() {
-			t.Errorf("%s: used %v renewing %v, want %v", model, used, renews, want)
+// #7748: three agy-cli accounts, only the user's own ~/.gemini account
+// listing the premium models. The provider must still route those models
+// to that account, not to the bridge accounts that lack them.
+func TestAgyOwnAccountRoutesModelsOnlyItLists(t *testing.T) {
+	claudeHome(t)
+	t.Setenv("MAGPIE_BUN", "")
+	spec := "@magpie-community/opencode-agy-cli-auth"
+	write := func(name string, v any) {
+		t.Helper()
+		b, _ := json.Marshal(v)
+		os.MkdirAll(settings.Dir(), 0o700)
+		if err := os.WriteFile(filepath.Join(settings.Dir(), name), b, 0o600); err != nil {
+			t.Fatal(err)
 		}
 	}
-	// the pool's own windows (Claude & GPT's 7 days and 5 hours) hold
-	// its models at a cap the user set on the pool
-	var held []string
-	for _, l := range a.capLimits("claude-opus-5-5-high") {
-		if l.Name != "Claude Opus 5.5" {
-			held = append(held, l.Name)
+	write("plugins.json", map[string]any{"plugins": []map[string]any{{"spec": spec}}})
+	write("plugin-auth.json", map[string]map[string]any{
+		"agy-cli":   {"type": "oauth", "access": "own-access", "refresh": "own-refresh", "expires": 4102444800000, "metadata": map[string]any{"email": "own@example.com"}},
+		"agy-cli#a": {"type": "oauth", "access": "a-access", "refresh": "a-refresh", "expires": 4102444800000, "metadata": map[string]any{"email": "a@example.com", "agyHome": "aaaaaaaa"}},
+		"agy-cli#b": {"type": "oauth", "access": "b-access", "refresh": "b-refresh", "expires": 4102444800000, "metadata": map[string]any{"email": "b@example.com", "agyHome": "bbbbbbbb"}},
+	})
+	premium := []string{"gemini-3.8-flash", "gemini-4-argon", "gemini-4-carbon", "gemini-4-neon", "claude-sonnet-5-5"}
+	plugin.UseCached([]plugin.Provider{{
+		ID: "agy-cli", Spec: spec, Name: "Antigravity (local agy CLI)",
+		Methods: []plugin.Method{{Type: "oauth", Label: "Sign in"}},
+		Accounts: []plugin.Account{
+			{Key: "agy-cli", Type: "oauth", AccountID: "own@example.com", Models: premium},
+			{Key: "agy-cli#a", Type: "oauth", AccountID: "a@example.com", Models: []string{"gemini-3.8-flash"}},
+			{Key: "agy-cli#b", Type: "oauth", AccountID: "b@example.com", Models: []string{"gemini-3.8-flash"}},
+		},
+		Models: listedModels(t, `[
+			{"id":"gemini-3.8-flash","name":"Gemini 3.8 Flash"},
+			{"id":"gemini-4-argon","name":"Gemini 4 Argon"},
+			{"id":"gemini-4-carbon","name":"Gemini 4 Carbon"},
+			{"id":"gemini-4-neon","name":"Gemini 4 Neon"},
+			{"id":"claude-sonnet-5-5","name":"Claude Sonnet 5.5"}
+		]`),
+	}})
+	t.Cleanup(func() { plugin.UseCached(nil) })
+	saveLogins(t,
+		savedLogin{Agent: "plugin:agy-cli", User: "a@example.com", Home: "agy-cli#a", On: true, Order: 1},
+		savedLogin{Agent: "plugin:agy-cli", User: "b@example.com", Home: "agy-cli#b", On: true, Order: 2},
+		savedLogin{Agent: "plugin:agy-cli", User: "own@example.com", Home: "agy-cli", On: true, Order: 3},
+	)
+
+	var pp Provider
+	for _, p := range pluginAccounts() {
+		if p.ID == "agy-cli" {
+			pp = p
+			break
 		}
 	}
-	if len(held) != 2 || !strings.Contains(held[0], "7 days") || !strings.Contains(held[1], "5 hours") {
-		t.Errorf("Opus 5.5 held at a cap by %q, want Claude & GPT's 7 days and 5 hours", held)
+	if pp.ID == "" {
+		t.Fatal("agy-cli provider is missing")
 	}
+	out, left, barred := pp.AccountsFor("gemini-4-argon", nil)
+	if len(out) != 1 || out[0].Account.pluginKey != "agy-cli" {
+		t.Fatalf("gemini-4-argon goes to %+v (left %+v, barred %+v), want only the own account", out, left, barred)
+	}
+	if len(left) != 2 {
+		t.Fatalf("bridge accounts that lack gemini-4-argon were not left behind: %+v", left)
+	}
+	out, left, barred = pp.AccountsFor("gemini-3.8-flash", nil)
+	if len(out) != 3 || len(left) != 0 || len(barred) != 0 {
+		t.Fatalf("gemini-3.8-flash goes to %+v (left %+v, barred %+v), want all three accounts", out, left, barred)
+	}
+	keys := []string{}
+	for _, a := range out {
+		keys = append(keys, a.Account.pluginKey)
+	}
+	slices.Sort(keys)
+	if !slices.Equal(keys, []string{"agy-cli", "agy-cli#a", "agy-cli#b"}) {
+		t.Fatalf("accounts for a shared model: %v", keys)
+	}
+}
 
-	// 0.1.114's reading, every window aside: what the reporter saw
-	for i := range u.Windows {
-		u.Windows[i].Aside = true
+// The agy bridge lists effort variants (`gemini-4-argon-high`) while
+// Magpie routes the family id (`gemini-4-argon`). A bridge account whose
+// list fell back serves all models; the own account must still match its
+// raw family variants, or it is left out after the fallback accounts.
+func TestAgyPluginFamilyListsRawEffortVariants(t *testing.T) {
+	claudeHome(t)
+	t.Setenv("MAGPIE_BUN", "")
+	spec := "@magpie-community/opencode-agy-cli-auth"
+	write := func(name string, v any) {
+		t.Helper()
+		b, _ := json.Marshal(v)
+		os.MkdirAll(settings.Dir(), 0o700)
+		if err := os.WriteFile(filepath.Join(settings.Dir(), name), b, 0o600); err != nil {
+			t.Fatal(err)
+		}
 	}
-	if a, ok := routedAllowance("plugin:agy-cli", "a@gmail.com", read(u), now); ok {
-		t.Fatalf("an all-aside reading gave routing %+v", a)
+	write("plugins.json", map[string]any{"plugins": []map[string]any{{"spec": spec}}})
+	write("plugin-auth.json", map[string]map[string]any{
+		"agy-cli":   {"type": "oauth", "access": "own-access", "refresh": "own-refresh", "expires": 4102444800000},
+		"agy-cli#a": {"type": "oauth", "access": "a-access", "refresh": "a-refresh", "expires": 4102444800000, "metadata": map[string]any{"agyHome": "aaaaaaaa"}},
+		"agy-cli#b": {"type": "oauth", "access": "b-access", "refresh": "b-refresh", "expires": 4102444800000, "metadata": map[string]any{"agyHome": "bbbbbbbb"}},
+	})
+	plugin.UseCached([]plugin.Provider{{
+		ID: "agy-cli", Spec: spec, Name: "Antigravity (local agy CLI)",
+		Methods: []plugin.Method{{Type: "oauth", Label: "Sign in"}},
+		Accounts: []plugin.Account{
+			{Key: "agy-cli#a", Type: "oauth", AccountID: "a@example.com"},
+			{Key: "agy-cli#b", Type: "oauth", AccountID: "b@example.com"},
+			{Key: "agy-cli", Type: "oauth", AccountID: "own@example.com", Models: []string{
+				"gemini-4-argon-high", "gemini-4-argon-medium", "gemini-4-argon-low",
+				"claude-sonnet-5-5",
+			}},
+		},
+		Models: listedModels(t, `[
+			{"id":"gemini-4-argon","name":"Gemini 4 Argon"},
+			{"id":"claude-sonnet-5-5","name":"Claude Sonnet 5.5"}
+		]`),
+	}})
+	t.Cleanup(func() { plugin.UseCached(nil) })
+	saveLogins(t,
+		savedLogin{Agent: "plugin:agy-cli", User: "a@example.com", Home: "agy-cli#a", On: true, Order: 1},
+		savedLogin{Agent: "plugin:agy-cli", User: "b@example.com", Home: "agy-cli#b", On: true, Order: 2},
+		savedLogin{Agent: "plugin:agy-cli", User: "own@example.com", Home: "agy-cli", On: true, Order: 3},
+	)
+	pp := pluginAccounts()[0]
+	out, left, _ := pp.AccountsFor("gemini-4-argon", nil)
+	if !slices.ContainsFunc(out, func(a AccountOn) bool { return a.Account.pluginKey == "agy-cli" }) {
+		t.Fatalf("the own account's raw argon variants did not match the family: out=%+v left=%+v", out, left)
+	}
+	if slices.ContainsFunc(left, func(a AccountOn) bool { return a.Account.pluginKey == "agy-cli" }) {
+		t.Fatalf("the own account was left out: %+v", left)
 	}
 }

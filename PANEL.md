@@ -5,6 +5,8 @@ This is an unofficial public maintenance fork of
 source of truth for the application, releases, provider contracts and
 production installs.
 
+See [UPSTREAM-AUDIT.md](UPSTREAM-AUDIT.md) for the current core issue and PR inventory.
+
 ## Scope
 
 - keep `main` as a fast-forward mirror of upstream `main`;

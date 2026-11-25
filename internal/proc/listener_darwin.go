@@ -13,31 +13,18 @@ import (
 )
 
 // listeningOn asks lsof, which lists this user's processes.
-func listeningOn(ctx context.Context, port int) ([]int, error) {
+func listeningOn(ctx context.Context, target listenTarget) ([]int, error) {
 	lsof := "/usr/sbin/lsof"
 	if _, err := os.Stat(lsof); err != nil {
 		lsof = "lsof"
 	}
-	out, err := CommandContext(ctx, lsof, "-nP", "-a", "-iTCP:"+strconv.Itoa(port), "-sTCP:LISTEN", "-t").Output()
+	out, err := CommandContext(ctx, lsof, "-nP", "-a", "-iTCP:"+strconv.Itoa(target.port), "-sTCP:LISTEN", "-Fpn").Output()
 	var ee *exec.ExitError
 	if err != nil && !(errors.As(err, &ee) && len(bytes.TrimSpace(out)) == 0) {
 		return nil, err
 	}
 	// lsof says 1 for none found
-	return pids(string(out)), nil
-}
-
-// pids reads one id a line.
-func pids(out string) []int {
-	var ps []int
-	seen := map[int]bool{}
-	for _, l := range strings.Fields(out) {
-		if n, err := strconv.Atoi(l); err == nil && n > 0 && !seen[n] {
-			seen[n] = true
-			ps = append(ps, n)
-		}
-	}
-	return ps
+	return pidsMatching(lsofListeners(string(out)), target), nil
 }
 
 // executable reads kern.procargs2: the argument count, then the path the

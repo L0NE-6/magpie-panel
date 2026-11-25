@@ -1,13 +1,22 @@
 # Upstream Audit
 
-Snapshot: 2026-11-25. Upstream remains
+Snapshot: 2026-11-26. Upstream remains
 [`yetone/magpie`](https://github.com/yetone/magpie). The fork `main` is an
 exact mirror; `panel` contains maintenance documentation, the upstream-sync
-workflow, and verified local integrations.
+workflow, and verified local integrations. Upstream `main` is at
+`82127a85`.
 
 ## Upstream Sync
 
-The panel includes upstream `eab4b006` and the five commits before it:
+The panel now also includes the latest upstream changes:
+
+- `8a1498a4`: a shared gateway keeps the computer awake while it is shared;
+- `108b72ee`: an upgraded account row reports its current plan and draws its
+  Fable window;
+- `82127a85`: Zhipu's Chinese 1308/1310 responses rest the account as quota
+  until the reported window reset.
+
+It also retains upstream `eab4b006` and the five commits before it:
 
 - `bd0ac4ac`: CatPaw IDE conversation discovery;
 - `b94ffbec`: avoid counting encrypted GPT reasoning twice;
@@ -38,6 +47,12 @@ the shared session listing and transcript switches.
 | [#7755](https://github.com/yetone/magpie/issues/7755) | Integrated in panel as `88236698` | The artifact list/delete test now waits until the millisecond clock has moved past the previous artifact's timestamp before republishing it. The deterministic ID tie-break is retained, and the test passed 100 consecutive runs. The full artifact package still has an unrelated Windows file-mode assertion failure. |
 | [#7702](https://github.com/yetone/magpie/issues/7702) | Integrated in panel as `576290ab` | A relayed Gemini request ending on a model turn gets the same synthetic user continuation as the translated non-streaming path. Function-response tails remain untouched. The streaming regression test, race and vet pass. |
 | [#7753](https://github.com/yetone/magpie/issues/7753) | Integrated in panel as `f0f52aa6` | Custom-tool argument streaming no longer aborts on JSON-invalid escapes, bare control characters or unescaped quotes; standard escapes, surrogate pairs, split UTF-8 and truncated escapes are still normalized. Streamed deltas and finished inputs share one normalizer. 31 focused tests, race and vet pass. |
+| [#7752](https://github.com/yetone/magpie/issues/7752) | Integrated in panel as `7702e4a7` | GUI tests now follow the existing responsive layout: the standalone Artifacts tab is expected at 1024px and above, while narrower layouts use the Library header's Artifacts entry. Chromium and WebKit each pass 2/2. |
+| [#7757](https://github.com/yetone/magpie/issues/7757) | Integrated in panel as `4d49822d` | The artifact command test waits until the millisecond clock moves past the first artifact's second publish before creating its comparator. The production stable ordering is unchanged. The test passes 100 consecutive runs, 10 race iterations and vet. |
+| [#7754](https://github.com/yetone/magpie/issues/7754) | Integrated in panel as `9c4faf6` | Listener ownership now matches the gateway's local address on Darwin, Linux `/proc` and Windows, while the port-only API keeps its compatibility semantics. A real same-port `127.0.0.1`/`127.0.0.2` regression passes; focused proc, gateway and GUI tests, vet and Darwin/Linux cross-compilation pass. |
+| [#6699](https://github.com/yetone/magpie/issues/6699) | Integrated in panel as `a2a40af8` | When `~/.agents/skills` aliases the library's own skills directory, shared-entry discovery, ownership, hand-over and hand-back all stop treating the library's entries as external user entries. Tick, symlink and Windows-junction tests pass. |
+| [#6697](https://github.com/yetone/magpie/issues/6697) | Integrated in panel as `e20be33` | Sync rebuilds a missing folder skill entry from `source.dir`, carries the dangling state across per-step reloads, removes Magpie's broken agent links, and reports skills whose source is also gone. Focused, related, race and vet checks pass. |
+| [#7740](https://github.com/yetone/magpie/issues/7740) | Integrated in panel as `e4ac00b` | The directory hash memo now persists across `magpie library sync` processes and is validated by path, type, size and mtime. The regression drops a second-process read from 6,329,271 bytes to 38,365 bytes. Focused, related, race, vet and Linux test compilation pass. |
 
 ## High-Risk Open Issues
 
@@ -45,7 +60,6 @@ the shared session listing and transcript switches.
 | :--- | :--- | :--- |
 | [#7438](https://github.com/yetone/magpie/issues/7438) | Open; no deterministic reproduction or patch | Static audits found no deletion path in the update apply flow or the resident plugin JavaScript. The update swap is two file renames and the idle transition performs no filesystem cleanup. The remaining suspects are the external `agy` 1.5.14 artifact, whose fingerprint is no longer retrievable, and a machine-local idle-triggered action outside the captured USN window. Sysmon is now installed on the reporter's machine. Do not mark this fixed without a process-level reproduction. |
 | [#7708](https://github.com/yetone/magpie/issues/7708) | Open product decision; no patch under the current contract | Upstream's check shows the search provider receives only magpie's isolated search ask, not the agent conversation, and the Routing row records `kind: web_search` with the originating agent/model. Native search is a global Automatic slot; `visible` and `hiddenModels` narrow model lists but do not scope that slot. Per-agent search isolation needs a maintainer decision on fallback semantics rather than a mechanical fix. |
-| [#6699](https://github.com/yetone/magpie/issues/6699) / [#6697](https://github.com/yetone/magpie/issues/6697) | Alias protection integrated as `a2a40af8`; sync self-healing remains open | When `~/.agents/skills` is the library's own skills directory, hand-over treated library entries as external user entries and could remove them. The P0 guard now short-circuits shared-entry discovery, shared ownership, hand-over and hand-back; tick, symlink and Windows-junction tests pass. Missing entries, dangling links and a doctor/self-healing path remain P1. |
 
 ## Open Pull Requests
 

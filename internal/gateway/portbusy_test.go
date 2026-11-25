@@ -11,22 +11,22 @@ import (
 	"github.com/yetone/magpie/internal/proc"
 )
 
-func noHolder(context.Context, int) (proc.Holder, bool) { return proc.Holder{}, false }
-func noServe(context.Context, int) bool                 { return false }
+func noHolder(context.Context, string) (proc.Holder, bool) { return proc.Holder{}, false }
+func noServe(context.Context, int) bool                    { return false }
 
 // pluoki on X: Tailscale's serve held the gateway's port. Whoever holds it
 // is named when it is read, Tailscale gets the way out, and a holder that
 // can't be read is not named at all.
 func TestWhoHolds(t *testing.T) {
 	ctx := context.Background()
-	tsd := func(context.Context, int) (proc.Holder, bool) {
+	tsd := func(context.Context, string) (proc.Holder, bool) {
 		return proc.Holder{PID: 612, Name: "tailscaled", Path: "/usr/sbin/tailscaled"}, true
 	}
-	nginx := func(context.Context, int) (proc.Holder, bool) {
+	nginx := func(context.Context, string) (proc.Holder, bool) {
 		return proc.Holder{PID: 77, Name: "nginx", Path: "/usr/sbin/nginx"}, true
 	}
 
-	b, ok := whoHolds(ctx, "8848", tsd, noServe)
+	b, ok := whoHolds(ctx, "127.0.0.1:8848", tsd, noServe)
 	if !ok || !b.Tailscale || b.Name != "tailscaled" || b.PID != 612 || b.Alt != "8443" {
 		t.Fatalf("tailscaled: %+v %v", b, ok)
 	}
@@ -38,7 +38,7 @@ func TestWhoHolds(t *testing.T) {
 	}
 
 	// the daemon is root's and out of sight: Tailscale's own list names the port
-	b, ok = whoHolds(ctx, "8848", noHolder, func(_ context.Context, p int) bool { return p == 8848 })
+	b, ok = whoHolds(ctx, "127.0.0.1:8848", noHolder, func(_ context.Context, p int) bool { return p == 8848 })
 	if !ok || !b.Tailscale || b.Name != "" || b.PID != 0 {
 		t.Fatalf("unseen daemon: %+v %v", b, ok)
 	}
@@ -47,7 +47,7 @@ func TestWhoHolds(t *testing.T) {
 	}
 
 	// another program: named, with no Tailscale advice (and Tailscale's list is not asked)
-	b, ok = whoHolds(ctx, "8848", nginx, func(context.Context, int) bool { t.Fatal("asked Tailscale about nginx's port"); return false })
+	b, ok = whoHolds(ctx, "127.0.0.1:8848", nginx, func(context.Context, int) bool { t.Fatal("asked Tailscale about nginx's port"); return false })
 	if !ok || b.Tailscale || b.Name != "nginx" {
 		t.Fatalf("nginx: %+v %v", b, ok)
 	}
@@ -56,7 +56,7 @@ func TestWhoHolds(t *testing.T) {
 	}
 
 	// nothing read: unknown, so nothing is said
-	if b, ok := whoHolds(ctx, "8848", noHolder, noServe); ok {
+	if b, ok := whoHolds(ctx, "127.0.0.1:8848", noHolder, noServe); ok {
 		t.Fatalf("an unread holder was named: %+v", b)
 	}
 	if _, ok := whoHolds(ctx, "x", tsd, noServe); ok {
@@ -64,7 +64,7 @@ func TestWhoHolds(t *testing.T) {
 	}
 
 	// the other port isn't the gateway's own
-	if b, _ := whoHolds(ctx, "8443", tsd, noServe); b.Alt != "9443" {
+	if b, _ := whoHolds(ctx, "127.0.0.1:8443", tsd, noServe); b.Alt != "9443" {
 		t.Errorf("alt for 8443: %q", b.Alt)
 	}
 }
@@ -86,7 +86,7 @@ func TestListenErrorNamesTheHolder(t *testing.T) {
 		readHolder, readServes = wasHolder, wasServes
 		ClearHeld()
 	}()
-	readHolder = func(context.Context, int) (proc.Holder, bool) {
+	readHolder = func(context.Context, string) (proc.Holder, bool) {
 		return proc.Holder{PID: 612, Name: "tailscaled", Path: "/usr/sbin/tailscaled"}, true
 	}
 	readServes = noServe
@@ -130,16 +130,16 @@ func TestAddrInUseIsOnlyThat(t *testing.T) {
 func TestWhoHoldsOwnMagpie(t *testing.T) {
 	was := readOwn
 	defer func() { readOwn = was }()
-	svc := func(context.Context, int) (proc.Holder, bool) {
+	svc := func(context.Context, string) (proc.Holder, bool) {
 		return proc.Holder{PID: 47634, Name: "magpie", Path: "/home/u/.local/bin/magpie"}, true
 	}
 	readOwn = func(h proc.Holder) bool { return h.PID == 47634 }
-	b, ok := whoHolds(context.Background(), "3425", svc, noServe)
+	b, ok := whoHolds(context.Background(), "127.0.0.1:3425", svc, noServe)
 	if !ok || !b.Own {
 		t.Fatalf("own service: %+v %v", b, ok)
 	}
 	readOwn = func(proc.Holder) bool { return false }
-	if b, _ := whoHolds(context.Background(), "3425", svc, noServe); b.Own {
+	if b, _ := whoHolds(context.Background(), "127.0.0.1:3425", svc, noServe); b.Own {
 		t.Fatalf("another magpie marked own: %+v", b)
 	}
 }

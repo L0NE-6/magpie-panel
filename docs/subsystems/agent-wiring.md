@@ -258,6 +258,10 @@ local Claude Code, but cannot see a WSL shell's environment. A stopped distro
 must be running before these controls can read or write its settings.
 `TestClaudeSettingsWSL` verifies the distro boundary and the local settings.
 
+Obsidian's config and vault looks are bounded to one second. A File Provider
+path that does not answer is treated as having no Copilot and remembered as
+stalled for the process, so one unhealthy cloud vault does not hold startup.
+
 ## Verification
 
 ```sh

@@ -8,7 +8,10 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+	"sync"
+	syncatomic "sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/yetone/magpie/internal/gateway"
 	"github.com/yetone/magpie/internal/provider"
@@ -468,5 +471,58 @@ func TestObsidianDirsPerOS(t *testing.T) {
 	}
 	if got := obsidianDirs(home, cfg); !slices.Equal(got, obsidianDirsOn(runtime.GOOS, home, cfg, os.Getenv("APPDATA"))) {
 		t.Errorf("here: %v", got)
+	}
+}
+
+// A File Provider can leave a read blocked forever. The startup scan waits
+// only obsWait for it, treats the vault as not wired, and does not start
+// another blocked read when the same path is checked again.
+func TestObsidianStalledVaultLookIsBounded(t *testing.T) {
+	home := syncHome(t)
+	cfg := filepath.Join(home, ".config")
+	data := `{"providers":{"magpie":{"baseUrl":"http://127.0.0.1/agent/obsidian/v1"}}}`
+	path := obsidianVault(t, obsidianDirs(home, cfg)[0], "stalled", filepath.Join(home, "Stalled"), "4.0.19", data)
+
+	oldRead, oldWait := obsReadFile, obsWait
+	obsWait = 20 * time.Millisecond
+	started := make(chan struct{})
+	release := make(chan struct{})
+	var startOnce sync.Once
+	var calls syncatomic.Int32
+	obsReadFile = func(p string) ([]byte, error) {
+		if p == path {
+			calls.Add(1)
+			startOnce.Do(func() { close(started) })
+			<-release
+		}
+		return oldRead(p)
+	}
+	t.Cleanup(func() {
+		close(release)
+		obsReadFile, obsWait = oldRead, oldWait
+		obsStalled.Delete(obsKey("read", path))
+	})
+
+	a := obsidian(home, cfg)
+	got := make(chan string, 1)
+	go func() { got <- a.Field("provider").Get() }()
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("the stalled read was not started")
+	}
+	select {
+	case v := <-got:
+		if v != "" {
+			t.Fatalf("a stalled vault read as wired: %q", v)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("the startup look waited past obsWait")
+	}
+	if v := a.Field("provider").Get(); v != "" {
+		t.Fatalf("a stalled vault read as wired on the next look: %q", v)
+	}
+	if n := calls.Load(); n != 1 {
+		t.Fatalf("stalled path read %d times, want 1", n)
 	}
 }

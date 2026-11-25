@@ -62,6 +62,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -85,6 +86,66 @@ const obsCopilotPlugin = "copilot"
 // obsCopilotMagpie is magpie's provider id in Copilot's providers.
 const obsCopilotMagpie = magpieID
 
+// obsWait bounds each look at Obsidian's config and vaults. A File Provider
+// can leave stat blocked in the kernel, where a context cannot cancel it, so
+// the look runs in a goroutine and its caller stops waiting after obsWait. A
+// path that times out is remembered for this process: otherwise every look
+// would leave another blocked goroutine behind.
+var obsWait = time.Second
+
+var (
+	obsStalled  sync.Map
+	obsReadFile = edit.Read
+)
+
+// obsWaitFor runs look in a goroutine because os.Stat cannot be cancelled.
+// The result channel is buffered so a look that finishes after the wait does
+// not block forever on its send.
+func obsWaitFor[T any](key string, look func() T) (value T, ok bool) {
+	if _, stalled := obsStalled.Load(key); stalled {
+		return value, false
+	}
+	done := make(chan T, 1)
+	go func() { done <- look() }()
+	timer := time.NewTimer(obsWait)
+	defer timer.Stop()
+	select {
+	case value = <-done:
+		return value, true
+	case <-timer.C:
+		obsStalled.Store(key, struct{}{})
+		return value, false
+	}
+}
+
+func obsKey(kind, path string) string { return kind + "\x00" + path }
+
+func obsFile(path string) bool {
+	v, ok := obsWaitFor(obsKey("file", path), func() bool { return isFile(path) })
+	return ok && v
+}
+
+func obsDir(path string) bool {
+	v, ok := obsWaitFor(obsKey("dir", path), func() bool { return isDir(path) })
+	return ok && v
+}
+
+type obsReadResult struct {
+	b   []byte
+	err error
+}
+
+func obsRead(path string) ([]byte, error) {
+	r, ok := obsWaitFor(obsKey("read", path), func() obsReadResult {
+		b, err := obsReadFile(path)
+		return obsReadResult{b: b, err: err}
+	})
+	if !ok {
+		return nil, fmt.Errorf("%s: Obsidian path did not answer within %s", path, obsWait)
+	}
+	return r.b, r.err
+}
+
 // obsCopilotModelSpace makes magpie's configured model ids in Copilot, one
 // per model id, the same on every sync (uuid v5 of "magpie/<id>").
 var obsCopilotModelSpace = uuid.NewSHA1(uuid.NameSpaceURL, []byte("https://usemagpie.ai/obsidian/copilot"))
@@ -95,7 +156,7 @@ func obsidian(home, cfg string) *Agent {
 	dirs := obsidianDirs(home, cfg)
 	dir := dirs[0]
 	for _, d := range dirs {
-		if isFile(filepath.Join(d, "obsidian.json")) {
+		if obsFile(filepath.Join(d, "obsidian.json")) {
 			dir = d
 			break
 		}
@@ -210,7 +271,7 @@ func obsidianDirsOn(goos, home, cfg, appData string) []string {
 func obsidianVaults(dirs []string) []string {
 	var out []string
 	for _, d := range dirs {
-		b, err := edit.Read(filepath.Join(d, "obsidian.json"))
+		b, err := obsRead(filepath.Join(d, "obsidian.json"))
 		if err != nil || len(b) == 0 {
 			continue
 		}
@@ -229,7 +290,7 @@ func obsidianVaults(dirs []string) []string {
 		sort.Strings(ids)
 		for _, id := range ids {
 			p := doc.Vaults[id].Path
-			if p == "" || !isDir(p) || slices.Contains(out, filepath.Clean(p)) {
+			if p == "" || !obsDir(p) || slices.Contains(out, filepath.Clean(p)) {
 				continue
 			}
 			out = append(out, filepath.Clean(p))
@@ -248,12 +309,12 @@ func obsCopilotData(vault string) string { return filepath.Join(obsCopilotDir(va
 
 // obsCopilotHere says vault has Copilot installed.
 func obsCopilotHere(vault string) bool {
-	return isFile(filepath.Join(obsCopilotDir(vault), "manifest.json"))
+	return obsFile(filepath.Join(obsCopilotDir(vault), "manifest.json"))
 }
 
 // obsCopilotWired says the settings file at path has magpie's provider.
 func obsCopilotWired(path string) bool {
-	b, err := edit.Read(path)
+	b, err := obsRead(path)
 	return err == nil && obsCopilotOurs(gjson.GetBytes(b, "providers."+obsCopilotMagpie))
 }
 
@@ -274,7 +335,7 @@ func obsCopilotRead(path string) (map[string]json.RawMessage, []byte, error) {
 	if v := obsCopilotMajor(filepath.Join(dir, "manifest.json")); v > 0 && v < 4 {
 		return nil, nil, fmt.Errorf("%s is Copilot %d: magpie sets Copilot for Obsidian 4 and later — update it in Obsidian's Settings › Community plugins", dir, v)
 	}
-	b, err := edit.Read(path)
+	b, err := obsRead(path)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -291,7 +352,7 @@ func obsCopilotRead(path string) (map[string]json.RawMessage, []byte, error) {
 // obsCopilotMajor is the major version manifest.json at path says, 0 when it
 // says none.
 func obsCopilotMajor(path string) int {
-	b, err := edit.Read(path)
+	b, err := obsRead(path)
 	if err != nil {
 		return 0
 	}

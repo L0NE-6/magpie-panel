@@ -20,7 +20,7 @@ inventory.
 
 At the time this branch was updated, upstream had approximately:
 
-- 5,089 open issues;
+- 5,102 open issues;
 - 16 open pull requests;
 - active commits on `main`.
 

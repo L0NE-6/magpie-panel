@@ -3,6 +3,9 @@
 magpie.strings({
   zh: {
     "Other model": "其他模型",
+    "Reasonix has {n} session stores with unreadable or unknown data. Their history may be incomplete.": "有 {n} 个 Reasonix 会话存储存在无法读取或未知的数据，其历史可能不完整。",
+    "Partial usage history": "用量历史不完整",
+    "Only retained native usage is counted; older records are unavailable.": "仅统计现存的本地用量记录，缺失的历史记录无法计入。",
     "Check…": "检查…",
     "Tries that failed, those handed on to another provider too": "失败的尝试，包括转交给其他供应商的",
     "Replies that named another model than the one asked for": "回复标明的模型与请求的不同",
@@ -300,6 +303,9 @@ magpie.strings({
   },
   "zh-TW": {
     "Other model": "其他模型",
+    "Reasonix has {n} session stores with unreadable or unknown data. Their history may be incomplete.": "有 {n} 個 Reasonix 工作階段儲存區存在無法讀取或未知的資料，其歷史可能不完整。",
+    "Partial usage history": "用量歷史不完整",
+    "Only retained native usage is counted; older records are unavailable.": "僅統計現存的本地用量記錄，缺失的歷史記錄無法計入。",
     "Check…": "檢查…",
     "Tries that failed, those handed on to another provider too": "失敗的嘗試，包括轉交給其他供應商的",
     "Replies that named another model than the one asked for": "回覆標明的模型與請求的不同",
@@ -597,6 +603,9 @@ magpie.strings({
   },
   ja: {
     "Other model": "別のモデル",
+    "Reasonix has {n} session stores with unreadable or unknown data. Their history may be incomplete.": "読み取れない、または未知のデータを含む Reasonix セッションストアが {n} 件あります。履歴が不完全な可能性があります。",
+    "Partial usage history": "使用履歴が不完全です",
+    "Only retained native usage is counted; older records are unavailable.": "保存されているローカル使用記録のみを集計します。失われた履歴は含まれません。",
     "Check…": "チェック…",
     "Tries that failed, those handed on to another provider too": "失敗した試行（別のプロバイダに回したものも含む）",
     "Replies that named another model than the one asked for": "要求したものと別のモデル名を返した返答",
@@ -894,6 +903,9 @@ magpie.strings({
   },
   de: {
     "Other model": "Anderes Modell",
+    "Reasonix has {n} session stores with unreadable or unknown data. Their history may be incomplete.": "{n} Reasonix-Sitzungsspeicher enthalten unlesbare oder unbekannte Daten. Ihr Verlauf ist möglicherweise unvollständig.",
+    "Partial usage history": "Unvollständiger Nutzungsverlauf",
+    "Only retained native usage is counted; older records are unavailable.": "Nur erhaltene lokale Nutzungsdaten werden gezählt; ältere Datensätze sind nicht verfügbar.",
     "Check…": "Prüfen…",
     "Tries that failed, those handed on to another provider too": "Fehlgeschlagene Versuche, auch an einen anderen Anbieter weitergegebene",
     "Replies that named another model than the one asked for": "Antworten, die ein anderes als das verlangte Modell nannten",

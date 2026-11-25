@@ -83,17 +83,18 @@ func (st Stats) shifted(s Summary) Summary {
 
 // Summary is one session's share of a range.
 type Summary struct {
-	Key           string        `json:"key"` // agent:id as its files are grouped, for Get
-	Agent         string        `json:"agent"`
-	ID            string        `json:"id"`
-	Cwd           string        `json:"cwd"`
-	Title         string        `json:"title"`
-	Nickname      string        `json:"nickname,omitempty"`
-	Last          time.Time     `json:"last"`
-	Role          string        `json:"role,omitempty"`
-	ParentSession string        `json:"parent_session,omitempty"`
-	RootSession   string        `json:"root_session,omitempty"`
-	ModelEffort   []ModelEffort `json:"model_effort,omitempty"`
+	Key             string        `json:"key"` // agent:id as its files are grouped, for Get
+	Agent           string        `json:"agent"`
+	ID              string        `json:"id"`
+	Cwd             string        `json:"cwd"`
+	Title           string        `json:"title"`
+	Nickname        string        `json:"nickname,omitempty"`
+	UsageIncomplete bool          `json:"usage_incomplete,omitempty"`
+	Last            time.Time     `json:"last"`
+	Role            string        `json:"role,omitempty"`
+	ParentSession   string        `json:"parent_session,omitempty"`
+	RootSession     string        `json:"root_session,omitempty"`
+	ModelEffort     []ModelEffort `json:"model_effort,omitempty"`
 	// Gateway: magpie knows the session only from the gateway's records
 	// (MergeExternalStats). The agent left no file magpie reads, so it has
 	// no folder, and no prompt unless gateway conversations were recorded
@@ -447,7 +448,7 @@ func statsOfRange(days int, today time.Time, files []file, copies map[string]str
 			}
 			pd := &sh.perDate[pi]
 			for model, t := range d.Models.all() {
-				if !t.zero() {
+				if !t.zero() || f.agent == "reasonix" {
 					mi := slices.IndexFunc(sh.models, func(m modelShare) bool { return m.model == model })
 					if mi < 0 {
 						sh.models = append(sh.models, modelShare{model: model})
@@ -574,8 +575,9 @@ func statsOfRange(days int, today time.Time, files []file, copies map[string]str
 		setSessionCodexIdentity(&s, identities)
 		setSessionCodexTaskTitle(&s, taskTitles)
 		sum := Summary{Key: key, Agent: cmp.Or(s.App, s.Agent), ID: s.ID, Cwd: cmp.Or(folder[key], s.Cwd), Title: clip(s.Title, titleKept),
-			Nickname: s.Nickname,
-			Last:     s.Last, Role: s.Role, ParentSession: s.ParentSession, RootSession: s.RootSession, Priced: true, Active: sh.active / 1000, Models: []string{}, Days: []int{},
+			Nickname:        s.Nickname,
+			UsageIncomplete: s.UsageIncomplete,
+			Last:            s.Last, Role: s.Role, ParentSession: s.ParentSession, RootSession: s.RootSession, Priced: true, Active: sh.active / 1000, Models: []string{}, Days: []int{},
 			Prompts: sh.prompts, Replies: sh.replies, tools: countsOf(sh.tools, nil), skills: countsOf(sh.skills, sh.skillLast)}
 		for _, n := range sh.tools {
 			sum.ToolCalls += n

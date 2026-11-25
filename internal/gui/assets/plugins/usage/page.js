@@ -4716,6 +4716,8 @@ function renderSessions() {
   const stale = sessOverAt !== sessOverQ();
 
   const stats = $("#sessStats");
+  const unsupportedReasonix = (sessAgent === "all" || sessAgent === "reasonix") && sessions?.unsupported_reasonix > 0;
+  const compatibilityNote = t("Reasonix has {n} session stores with unreadable or unknown data. Their history may be incomplete.", { n: sessions?.unsupported_reasonix || 0 });
   stats.replaceChildren();
   const box = $("#sessList");
   box.replaceChildren();
@@ -4726,7 +4728,7 @@ function renderSessions() {
     stats.classList.remove("six");
     stats.classList.add("empty");
     const filtered = sessAgent !== "all" || sessModel || sessFolder || q;
-    stats.append(el("div", "none", !all.length && !rows.length ? t("No sessions yet. Claude Code's, Codex's, Hermes, OpenCode's and Pi's sessions on this computer show up here, with what each cost and the command that resumes it.") : filtered ? t("No session matches.") : t("Nothing in this range.")));
+    stats.append(el("div", "none", unsupportedReasonix ? compatibilityNote : !all.length && !rows.length ? t("No sessions yet. Claude Code's, Codex's, Hermes, OpenCode's and Pi's sessions on this computer show up here, with what each cost and the command that resumes it.") : filtered ? t("No session matches.") : t("Nothing in this range.")));
     if (from && all.some((s) => byAgent(s) && byFolder(s) &&
       (!sessModel || s.models.some((m) => m.model === sessModel)) &&
       (!q || [s.title, s.cwd, s.id, s.name, ...s.models.map((m) => m.model)].some((x) => (x || "").toLowerCase().includes(q))))) {
@@ -4829,7 +4831,7 @@ function renderSessions() {
       : t(sessTotal === 1 ? "{n} session" : "{n} sessions", { n: sessTotal }));
   }
   if (dirs) parts.push(dirs);
-  $("#sessNote").textContent = parts.join(" · ");
+  $("#sessNote").textContent = unsupportedReasonix ? compatibilityNote : parts.join(" · ");
 }
 
 // sessSums adds up usage rows by one of their fields, the most tokens first
@@ -5459,6 +5461,10 @@ function sessSpent(s) {
   const num = el("div", "num" + (tokens ? "" : " none"));
   num.append(el("b", "", tokens ? fmtN(tokens) : "—"));
   if (tokens) num.append(el("small", "", t("{a} in · {b} out", { a: fmtN(s.input), b: fmtN(s.output) }) + (s.cache_read ? " · " + t("{n} cached", { n: fmtN(s.cache_read) }) : "")));
+  if (s.usage_incomplete) {
+    num.append(el("small", "", t("Partial usage history")));
+    num.title = t("Only retained native usage is counted; older records are unavailable.");
+  }
   const sc = sessCost(s);
   const cost = el("div", "cost" + (sc === "—" ? " none" : ""), sc);
   if (sc === "—") cost.title = t("No known price for {models}", { models: sessModelNames(s.models.map((m) => m.model)) || "—" });
@@ -5523,6 +5529,7 @@ function sessionItem(s) {
 
 function sessionDetail(s) {
   const d = el("div", "sess-detail");
+  if (s.usage_incomplete) d.append(el("div", "sess-wait", t("Only retained native usage is counted; older records are unavailable.")));
   const line = (label, value, extra) => {
     const l = el("div", "sess-line");
     l.append(el("span", "k", label));

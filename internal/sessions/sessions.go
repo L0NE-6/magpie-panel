@@ -152,6 +152,8 @@ type Session struct {
 	// Subagents are the conversations its agent started inside it, each
 	// read with SubagentTranscript (subagents.go)
 	Subagents []Subagent `json:"subagents,omitempty"`
+	// UsageIncomplete means native history cannot establish a complete total.
+	UsageIncomplete bool `json:"usage_incomplete,omitempty"`
 	// WSL is the WSL distro the session ran in, its files read through
 	// \\wsl.localhost (see wsl.go); "" for this computer's own
 	WSL string `json:"wsl,omitempty"`
@@ -304,6 +306,11 @@ type StateMore struct {
 	// /rewind's summarize) left in the file. A copy made after one starts
 	// with that summary, so its Root is one of these (ccCopies).
 	Compacts []string `json:"compacts,omitempty"`
+	// Reasonix's native turn ledger uses a sequence across all turns.
+	ReasonixAt      int64  `json:"reasonix_at,omitempty"`
+	ReasonixCwd     string `json:"reasonix_cwd,omitempty"`
+	ReasonixSeq     uint64 `json:"reasonix_seq,omitempty"`
+	UsageIncomplete bool   `json:"usage_incomplete,omitempty"`
 	// Pi: in a forked session, the time it was forked; the lines before
 	// it are the copy of the session it was forked from
 	Since time.Time `json:"since,omitzero"`
@@ -359,6 +366,7 @@ func (m *StateMore) zero() bool {
 		len(m.CodexAgentConflicts) == 0 && m.Named == "" && m.Custom == "" && m.First == "" && m.Task == "" && !m.TaskRead && m.SubMeta == nil &&
 		len(m.Convs) == 0 && len(m.ResponseIDs) == 0 && len(m.SeedConvs) == 0 && len(m.TurnConvs) == 0 &&
 		m.Root == "" && m.Leaf == "" && len(m.Compacts) == 0 && m.Since.IsZero() &&
+		m.ReasonixAt == 0 && m.ReasonixCwd == "" && m.ReasonixSeq == 0 && !m.UsageIncomplete &&
 		m.Grok == nil && m.Droid == nil && m.Kimi == nil && m.Agy == nil && m.Dsh == nil && m.Cline == nil
 }
 
@@ -1013,7 +1021,7 @@ func allFilesWith(kept *filesKept, zcode func() []file) []file {
 	lists = append(lists, openCodeFiles(), piFiles(), raftFiles(), cindyFiles(), wslFiles("pi", "raft", "omp", "kimi", "antigravity", "agy"), zcode())
 	lists = append(lists, dshFiles(), clineFiles(), ccFiles("qoder", QoderDir("qoder")), ccFiles("qoder-cn", QoderDir("qoder-cn")),
 		grokFiles(), workbuddyFiles(), workbuddyAIFiles(), codebuddyFiles(), droidFiles(), ompFiles(), cursorFiles(), hermesFiles(), almaFiles(), openmausbotFiles(), liveagentFiles(), kimiFiles(), agyFiles(),
-		antigravityFiles()) // #2190
+		antigravityFiles(), reasonixFiles()) // #2190
 	// each lister asked Reads already; a file listed under another
 	// agent's name is held to that agent too
 	return allowed(kept.distinct(lists...))
@@ -1106,6 +1114,9 @@ func Dirs() []string {
 	}
 	out := ClaudeDirs()
 	out = append(out, CodexDirs()...)
+	if len(reasonixSessionDirs()) != 0 || len(reasonixStoreDirs()) != 0 {
+		out = append(out, ReasonixDir())
+	}
 	var named []os.FileInfo
 	for _, d := range []struct{ dir, sessions string }{
 		{OpenCodeDir(), OpenCodeDir()},
@@ -1722,7 +1733,7 @@ func refresh(want, all []file) {
 		if f.cold {
 			continue // in a stopped WSL distro: what was read of it stands
 		}
-		if s := parsed(f.path); s == nil || s.Size != f.size || s.Mod != f.mod.UnixNano() || ccStale(f, s) || (f.agent == "hermes" && (f.m().hermes == nil || f.m().rev == "" || s.more().DBRevision != f.m().rev)) || ((f.agent == "alma" || f.agent == "openmausbot" || f.agent == "cursor" || f.agent == "agy" || f.agent == "antigravity") && s.more().DBRevision != f.m().rev) {
+		if s := parsed(f.path); s == nil || s.Size != f.size || s.Mod != f.mod.UnixNano() || ccStale(f, s) || (f.agent == "hermes" && (f.m().hermes == nil || f.m().rev == "" || s.more().DBRevision != f.m().rev)) || ((f.agent == "alma" || f.agent == "reasonix" || f.agent == "openmausbot" || f.agent == "cursor" || f.agent == "agy" || f.agent == "antigravity") && s.more().DBRevision != f.m().rev) || (f.agent == "reasonix" && s.ID != f.m().sid) {
 			if parsing[f.path] != nil {
 				// a refresh is reading it, another or this one (a path
 				// listed twice): its last parse stands until that one is
@@ -2226,6 +2237,7 @@ func assembleListed(fs []file, price func(string) *catalog.Price, codexTitle fun
 		if st == nil {
 			continue
 		}
+		s.UsageIncomplete = s.UsageIncomplete || st.more().UsageIncomplete
 		if f.main {
 			if s.Cwd == "" {
 				s.Cwd = st.Cwd
@@ -2290,7 +2302,7 @@ func assembleListed(fs []file, price func(string) *catalog.Price, codexTitle fun
 			// which call went over a long-context tier isn't known here
 			m.Cost, m.Priced = p.At(0).CostSplit(m.Input, m.Output, m.CacheRead, m.CacheWrite, m.CacheWrite1h), true
 			s.Cost += m.Cost
-		} else {
+		} else if !m.Tokens.zero() {
 			s.Unpriced++
 		}
 		s.Tokens.add(m.Tokens)
@@ -2309,6 +2321,17 @@ func assembleListed(fs []file, price func(string) *catalog.Price, codexTitle fun
 	if s.Title == "" && s.Tokens.zero() {
 		return s, false // nothing was said in it
 	}
+	if !s.ReadOnly {
+		s.Resume = resumeCommand(s.WSL, s.Agent, s.ID, s.Cwd, s.Path)
+		if s.Agent == "reasonix" {
+			p := s.Path
+			if filepath.Base(p) == "events.frames" || filepath.Base(p) == "events.jsonl" {
+				p = s.ID
+			}
+			s.Resume = "reasonix --resume " + shellQuote(p)
+		}
+	}
+	s.Carry, s.Transcript = carries(s), HasTranscript(s.Agent)
 	return s, true
 }
 
@@ -2353,6 +2376,8 @@ func parserFor(agent string) sessionParser {
 		return sessionParser{whole: parseCursor}
 	case "codex":
 		return sessionParser{line: codexBody}
+	case "reasonix":
+		return sessionParser{line: reasonixLine}
 	case "pi", "raft", "cindy", "omp":
 		return sessionParser{line: piParse}
 	case "workbuddy", "workbuddy-ai", "codebuddy":
@@ -2381,6 +2406,15 @@ func parseRead(f file, old *state, calls *callsRide) *state {
 			calls.release()
 		}
 	}()
+	if f.agent == "reasonix" && strings.HasPrefix(f.m().rev, reasonixStoreRevision) {
+		return parseReasonixStore(f)
+	}
+	if f.agent == "reasonix" && strings.HasSuffix(f.path, ".wire.jsonl") {
+		return parseReasonixWire(f)
+	}
+	if f.agent == "reasonix" && old != nil && (old.ID != f.m().sid || f.main && !strings.HasPrefix(old.more().DBRevision, reasonixRevision)) {
+		old = nil
+	}
 	// sessions.json keeps aggregates only, and a rollout's window beside it
 	// (codex_window.go). A changed rollout with no window of its read kept
 	// rebuilds it from the source.
@@ -2419,6 +2453,12 @@ func parseRead(f file, old *state, calls *callsRide) *state {
 	if f.agent == "codex" {
 		head = func(b []byte) bool { return codexHead(s, b, f.main) }
 	}
+	if f.agent == "reasonix" {
+		s.ID = f.m().sid
+		if !f.main {
+			head = reasonixUsageHead
+		}
+	}
 	line := func(b []byte, _, _ int64) bool {
 		parser.line(s, b, f.main)
 		return true
@@ -2455,6 +2495,9 @@ func parseRead(f file, old *state, calls *callsRide) *state {
 	}
 	if isBuddy(f.agent) && s.Cwd == "" {
 		workbuddyMeta(s, f.path)
+	}
+	if f.agent == "reasonix" {
+		reasonixMetadata(s, f)
 	}
 	return s
 }
@@ -3105,6 +3148,12 @@ func resumeCommand(distro, agent, id, cwd, path string) string {
 			return ""
 		}
 		run = "cursor-agent --resume " + id
+	case "reasonix":
+		p := path
+		if filepath.Base(p) == "events.frames" || filepath.Base(p) == "events.jsonl" {
+			p = id
+		}
+		run = "reasonix --resume " + shellQuote(p)
 	default:
 		return ""
 	}

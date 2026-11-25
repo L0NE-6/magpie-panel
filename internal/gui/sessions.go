@@ -44,7 +44,8 @@ type sessionJSON struct {
 }
 
 type sessionsJSON struct {
-	Sessions []sessionJSON `json:"sessions"`
+	Sessions            []sessionJSON `json:"sessions"`
+	UnsupportedReasonix int           `json:"unsupported_reasonix,omitempty"`
 	// Terminal is set where magpie can open Terminal on the session: the
 	// Mac app, not a browser tab that may be on another computer.
 	Terminal bool     `json:"terminal"`
@@ -133,6 +134,7 @@ func sessionRoutes(mux *http.ServeMux, w Windows) {
 		}
 		listTags.Unlock()
 		list, made, same := sessions.ListUnless(sessions.All, made)
+		out.UnsupportedReasonix = sessions.UnsupportedReasonixStores()
 		if same {
 			rw.Header().Set("X-Magpie-Tag", r.Header.Get("X-Magpie-Had"))
 			rw.Header().Set("X-Magpie-Same", "1")
@@ -190,9 +192,10 @@ func sessionRoutes(mux *http.ServeMux, w Windows) {
 		}
 		listsRowed.Add(1)
 		tag := writeJSONRows(rw, r, "sessions", out.Sessions, struct {
-			Terminal bool     `json:"terminal"`
-			Dirs     []string `json:"dirs"`
-		}{out.Terminal, out.Dirs})
+			UnsupportedReasonix int      `json:"unsupported_reasonix,omitempty"`
+			Terminal            bool     `json:"terminal"`
+			Dirs                []string `json:"dirs"`
+		}{out.UnsupportedReasonix, out.Terminal, out.Dirs})
 		if tag != "" && logKnown {
 			now.made, now.tag = made, tag
 			listTags.Lock()

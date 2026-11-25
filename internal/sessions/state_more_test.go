@@ -23,6 +23,10 @@ func TestStateMoreZeroKnowsEveryField(t *testing.T) {
 			f.SetString("x")
 		case reflect.Bool:
 			f.SetBool(true)
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			f.SetInt(1)
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			f.SetUint(1)
 		case reflect.Slice:
 			f.Set(reflect.MakeSlice(f.Type(), 1, 1))
 		case reflect.Map:

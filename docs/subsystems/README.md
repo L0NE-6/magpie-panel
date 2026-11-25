@@ -20,6 +20,7 @@ These pages describe current responsibilities, runtime paths, state, and contrac
 | Pages agents make for the user: the artifacts MCP server, the sandboxed pages, Work › Artifacts, Claude Code's own Artifact tool left out | [Artifacts](artifacts.md) |
 | Antigravity's fast-tools plugin: batched search, reads, edits and checks (MCP), the workspace snapshot hook, the rules | [Fast tools](fast-tools.md) |
 | One skill, magpie-skills, listing the Library's skills in place of each agent's own | [Skill router](skill-router.md) |
+| Reasonix local conversations and retained native usage | [Reasonix sessions](reasonix-sessions.md) |
 | Tray, panel, window, `magpie web` and the page's JSON API | [GUI app shell](gui-shell.md) |
 | Encrypted backups and setup synchronization over WebDAV, S3 or GitHub | [Sync and backup](sync-backup.md) |
 

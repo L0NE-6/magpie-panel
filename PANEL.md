@@ -19,7 +19,7 @@ Live check on **2026-11-25**:
 
 - 5,110 open issues;
 - 16 open pull requests;
-- upstream `main` at `eab4b006`.
+- upstream `main` at `c4918150`.
 
 Counts are a snapshot and must be refreshed live.
 

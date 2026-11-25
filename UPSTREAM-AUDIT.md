@@ -32,6 +32,7 @@ the shared session listing and transcript switches.
 | [#7729](https://github.com/yetone/magpie/issues/7729) | Integrated in panel as `acd8dccf` | `serveWSL` leaves listeners to `http.Server.Shutdown` instead of closing them as its context ends, avoiding a false truncated-request error on Windows. Windows `WSL` tests, 10 race iterations and vet pass. |
 | [#7750](https://github.com/yetone/magpie/issues/7750) | Integrated in panel as `4b8b4d1a` | Obsidian config and vault probes are bounded to one second; a stalled path is treated as no Copilot and remembered once per process. Obsidian tests, the focused race test and vet pass. A real macOS File Provider stall remains unverified. |
 | [#7747](https://github.com/yetone/magpie/issues/7747) | Integrated in panel as `cb29c57f` | Each Claude run gets a unique ID and an optional `MAGPIE_CLAUDE_KILL` hook runs after the host tree ends, covering Docker/SSH/WSL exec boundaries. Abort waits for both cleanup paths. Focused gateway/TUI tests, race, native/Linux vet and Linux test compilation pass; no real Docker or WSL runtime was available. |
+| [#7749](https://github.com/yetone/magpie/issues/7749) | Integrated in panel as `a117be61` | A bare `~/.claude-* /settings.json` no longer makes a Claude Code profile unless it contains a key Claude Code or magpie writes. claude-mem is no longer listed or ticked, while credentials, projects and magpie's isolated Desktop Code tab still count. Focused tests and race pass. |
 
 ## High-Risk Open Issues
 

@@ -24,7 +24,7 @@ workflow, and verified local integrations.
 | [#1157](https://github.com/yetone/magpie/pull/1157) | Conflicting / dirty | P2 CI decision: run the whole provider race suite. |
 | [#1181](https://github.com/yetone/magpie/pull/1181) | Conflicting / dirty | P2 routing key plan windows; adapt to the current `cardFor` refactor. |
 | [#1258](https://github.com/yetone/magpie/pull/1258) | Conflicting / dirty | P1 signal handling; needs Linux drain and ignored-SIGINT tests. |
-| [#1331](https://github.com/yetone/magpie/pull/1331) | Conflicting / dirty | P1 local HTTPS for Microsoft 365; requires certificate lifecycle and trust-store review. |
+| [#1331](https://github.com/yetone/magpie/pull/1331) | Integrated in panel | Loopback HTTPS, constrained certificate SANs, explicit GUI trust flow and allowlisted CORS are integrated as `532f91a`; real macOS/Windows Office trust chains remain unverified. |
 
 ## Maintenance Rules
 

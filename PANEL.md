@@ -15,11 +15,11 @@ production installs.
 
 ## Snapshot
 
-Live check on **2026-11-25**:
+Live check on **2026-11-26 00:08 CST**:
 
-- 5,110 open issues;
+- 5,113 open issues;
 - 16 open pull requests;
-- upstream `main` at `c4918150`.
+- upstream `main` at `b013c525`.
 
 Counts are a snapshot and must be refreshed live.
 

@@ -99,7 +99,7 @@ func conversationParts(role string, parts []Part) []sessions.Part {
 		q := sessions.Part{Role: role, Text: p.Text, Kind: string(p.Kind), Name: p.Name}
 		switch p.Kind {
 		case ToolCall:
-			q.Kind, q.Text = "tool_use", string(redact.ScrubJSON(p.Args))
+			q.Kind, q.Text = "tool_use", string(redact.ScrubJSONWith(p.Args, settings.Shared().Scrubbing()))
 		case ToolResult:
 			q.Role = "tool"
 			if len(p.Images) > 0 {
@@ -124,7 +124,8 @@ func conversationParts(role string, parts []Part) []sessions.Part {
 
 func conversationTurn(proto provider.Protocol, input, output []byte) sessions.GatewayTurn {
 	t := sessions.GatewayTurn{Input: []sessions.Part{}, Output: []sessions.Part{}}
-	input, output = redact.ScrubJSON(input), redact.ScrubJSON(output)
+	o := settings.Shared().Scrubbing()
+	input, output = redact.ScrubJSONWith(input, o), redact.ScrubJSONWith(output, o)
 	q, err := parse(proto, input)
 	if err != nil {
 		t.Cut = true

@@ -1755,6 +1755,26 @@ func CarryPerModel(in, cur *Settings) {
 	}
 }
 
+// Redaction is what the gateway masks on the way to a vendor.
+func (s Settings) Redaction() redact.Options {
+	return redact.Options{Secrets: s.Redact, Personal: s.RedactPersonal, Kinds: s.RedactKinds,
+		Words: s.RedactWords, WordsAnyCase: s.RedactWordsAnyCase, WordsWhole: s.RedactWordsWhole,
+		Rules: s.RedactRules, Actions: s.RedactActions, Allow: s.RedactAllow, Shape: s.RedactShape}
+}
+
+// Scrubbing is what kept text — the request archive, the OTLP bodies and
+// gateway conversations — takes out: every secret, the user's words and
+// personal data by their own switches, and their rules while secrets are
+// masked for a vendor.
+func (s Settings) Scrubbing() redact.Options {
+	o := redact.Options{Secrets: true, Personal: s.RedactPersonal, Kinds: s.RedactKinds,
+		Words: s.RedactWords, WordsAnyCase: s.RedactWordsAnyCase, WordsWhole: s.RedactWordsWhole}
+	if s.Redact {
+		o.Rules = s.RedactRules
+	}
+	return o
+}
+
 // WorkingWindow is the context window Codex and Claude Code are told for a
 // model with a larger one, unless FullContext: Codex's own for OpenAI's
 // models that can take more.

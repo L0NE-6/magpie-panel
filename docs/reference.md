@@ -4568,9 +4568,11 @@ multiplies a metric's series (one set per name requests came with), which
 matters to a collector that limits or bills by series; a name is not unique,
 so keys sharing one are counted together. Prompt/reply text is exported only when
 **Include request and response bodies** is enabled (`MAGPIE_OTEL_BODIES=true`);
-secrets are masked and each body is limited to 256 KiB unless **Include the
-whole bodies** is enabled. Conversation IDs are exported only with
-conversation tracing; provider account names/keys are never exported.
+secrets are masked, personal data and masked words follow their Privacy
+switches, and the user's own masking rules apply while Mask secrets is on. Each
+body is limited to 256 KiB unless **Include the whole bodies** is enabled.
+Conversation IDs are exported only with conversation tracing; provider account
+names/keys are never exported.
 
 Whole bodies increase transient memory and allocation costs during read-back,
 secret scrubbing and JSON encoding; a 32 MiB request and reply can roughly

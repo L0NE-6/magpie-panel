@@ -72,11 +72,13 @@ func (e *otelExporter) sessionObserved(agent, session string, config settings.OT
 	return e.identities.Visible(agent, session)
 }
 
+// sessionBody is a session's input or output as the export keeps it, scrubbed
+// with every secret and what the user's masking covers.
 func sessionBody(body string, config settings.OTel) string {
 	if !config.Bodies {
 		return ""
 	}
-	body = string(redact.ScrubJSON([]byte(body)))
+	body = string(redact.ScrubJSONWith([]byte(body), settings.Shared().Scrubbing()))
 	cut := false
 	if !config.BodiesWhole && len(body) > 256<<10 {
 		body = body[:256<<10]

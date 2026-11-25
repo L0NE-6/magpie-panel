@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/yetone/magpie/internal/redact"
 	"github.com/yetone/magpie/internal/sessions"
 	"github.com/yetone/magpie/internal/settings"
 	"github.com/yetone/magpie/internal/testenv"
@@ -57,6 +58,35 @@ func TestSessionTraceWirePrivacyAndTokenOwnership(t *testing.T) {
 	cfg.BodiesWhole = true
 	if got := sessionBody(long, cfg); got != long {
 		t.Fatal("whole body truncated")
+	}
+}
+
+// A session body the OTLP export carries loses a user rule's key while Mask
+// secrets is on, and keeps it while the rule is off.
+func TestSessionBodyScrubsTheUsersRuleWhenSecretsAreMasked(t *testing.T) {
+	cfg := settings.OTel{Bodies: true}
+	rules := []redact.Rule{{Kind: "RELAY", Prefix: "rz_"}}
+	for _, tc := range []struct {
+		name   string
+		redact bool
+		key    string
+	}{
+		{"masking_on", true, "rz_SessionKey1234567"},
+		{"masking_off", false, "rz_SessionKey7654321"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := settings.Save(settings.Settings{Redact: tc.redact, RedactRules: rules}); err != nil {
+				t.Fatal(err)
+			}
+			got := sessionBody(`{"prompt":"send it to `+tc.key+`"}`, cfg)
+			if tc.redact {
+				if strings.Contains(got, tc.key) || !strings.Contains(got, "[REDACTED:RELAY]") {
+					t.Errorf("masking on, the exported session body: %s", got)
+				}
+			} else if !strings.Contains(got, tc.key) {
+				t.Errorf("masking off, the exported session body lost the key: %s", got)
+			}
+		})
 	}
 }
 

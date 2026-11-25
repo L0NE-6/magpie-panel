@@ -1,9 +1,0 @@
-{
-  "name": "magpie-recall-built",
-  "version": "0.1.0",
-  "type": "module",
-  "files": ["dist/"],
-  "magpie": {
-    "hooks": "./dist/recall.hooks.mjs"
-  }
-}

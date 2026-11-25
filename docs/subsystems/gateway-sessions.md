@@ -628,8 +628,10 @@ the Magpie config directory, using 0700 directories and 0600 files. Each line is
 one bounded turn; legacy per-turn JSON files remain readable until they expire.
 An incomplete final append is omitted from reads (marked truncated) and removed
 before the next append; complete earlier lines remain available. No headers are
-stored. Known secrets and secret-named JSON
-fields are scrubbed, but arbitrary sensitive text is not guaranteed removable.
+stored. Known secrets and secret-named JSON fields are scrubbed, as are the
+user's personal data and masked words by their Privacy switches, and their own
+masking rules while Mask secrets is on. Arbitrary sensitive text is not
+guaranteed removable.
 Response capture uses an 8 MiB temporary spool; input is bounded to 8 MiB too.
 Normalized turns are bounded to 1 MiB on disk, individual parts to 64 KiB,
 and each daily session file to 256 MiB. A full daily session file rejects further

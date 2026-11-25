@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/yetone/magpie/internal/provider"
+	"github.com/yetone/magpie/internal/redact"
 	"github.com/yetone/magpie/internal/sessions"
 	"github.com/yetone/magpie/internal/settings"
 	"github.com/yetone/magpie/internal/usage"
@@ -191,5 +192,32 @@ func TestGatewayConversationScrubsAndMarksIncomplete(t *testing.T) {
 	b, _ := json.Marshal(turn)
 	if !turn.Cut || strings.Contains(string(b), "private-value") || !strings.Contains(string(b), "partial") {
 		t.Fatalf("scrub or incomplete failed: %s", b)
+	}
+}
+
+// A gateway conversation is kept text too: a user rule's key goes while Mask
+// secrets is on and stays while it is off.
+func TestGatewayConversationScrubsUsersRuleWhenSecretsMasked(t *testing.T) {
+	fresh(t)
+	const key = "rz_ConversationKey1234567"
+	if err := settings.Save(settings.Settings{Redact: true,
+		RedactRules: []redact.Rule{{Kind: "RELAY", Prefix: "rz_"}}}); err != nil {
+		t.Fatal(err)
+	}
+	input := []byte(`{"messages":[{"role":"user","content":"send ` + key + `"}]}`)
+	output := []byte(`{"choices":[{"message":{"role":"assistant","content":"using ` + key + `"}}]}`)
+	turn := conversationTurn(provider.Chat, input, output)
+	b, _ := json.Marshal(turn)
+	if strings.Contains(string(b), key) || !strings.Contains(string(b), "[REDACTED:RELAY]") {
+		t.Fatalf("masking on, the conversation: %s", b)
+	}
+	if err := settings.Save(settings.Settings{
+		RedactRules: []redact.Rule{{Kind: "RELAY", Prefix: "rz_"}}}); err != nil {
+		t.Fatal(err)
+	}
+	turn = conversationTurn(provider.Chat, input, output)
+	b, _ = json.Marshal(turn)
+	if !strings.Contains(string(b), key) {
+		t.Fatalf("masking off, the conversation lost the key: %s", b)
 	}
 }

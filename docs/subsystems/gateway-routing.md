@@ -2571,8 +2571,10 @@ plugin's search API is noted as magpie handed it to the plugin
 back. The key an ask went with is replaced with its masked form in the
 path, query, headers and both bodies before anything is kept (`taken`),
 and the archive's own scrub takes Authorization and the like out as for
-every call. Bodies are kept up to `RequestArchiveMaxMB` (a longer answer
-is marked cut) and Recent calls keep their own 256 KiB; with the
+every call, with the user's personal data, masked words and — while Mask
+secrets is on — their own masking rules. Bodies are kept up to
+`RequestArchiveMaxMB` (a longer answer is marked cut) and Recent calls keep
+their own 256 KiB; with the
 archive off nothing is archived, but the route and Recent call are
 still there. Covered by `TestSearchAPIAskIsRoutedAndArchived`,
 `TestSearchAPIKeyInQueryNotArchived`, `TestPluginSearchAPIRoutedAndArchived`,

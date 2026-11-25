@@ -14,6 +14,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/yetone/magpie/internal/redact"
 	"github.com/yetone/magpie/internal/settings"
 )
 
@@ -289,4 +290,66 @@ func keys(m map[string][]byte) []string {
 		out = append(out, k)
 	}
 	return out
+}
+
+// archiveRuleVendor echoes the key the user's rule names.
+type archiveRuleVendor struct{ key string }
+
+func (v archiveRuleVendor) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	io.WriteString(w, `{"id":"c1","object":"chat.completion","model":"m1","choices":[{"index":0,"message":{"role":"assistant","content":"using `+v.key+`"},"finish_reason":"stop"}],"usage":{"prompt_tokens":3,"completion_tokens":1}}`)
+}
+
+// A user's masking rule is gated on Mask secrets: with it on, the archive
+// loses the key from the reply too, after masking put the agent's value back;
+// with it off, the key is kept as it went.
+func TestArchiveScrubsTheUsersRuleWhenSecretsAreMasked(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		redact     bool
+		requestKey string
+		replyKey   string
+	}{
+		{"masking_on", true, "rz_ArchiveKey1234567", "rz_ReplyKey1234567"},
+		{"masking_off", false, "rz_ArchiveKey7654321", "rz_ReplyKey7654321"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fresh(t)
+			serveOn(t, "fake", "k", []string{"m1"}, archiveRuleVendor{key: tc.replyKey})
+			if err := settings.Save(settings.Settings{RequestArchive: true, Redact: tc.redact,
+				RedactRules: []redact.Rule{{Kind: "RELAY", Prefix: "rz_"}}}); err != nil {
+				t.Fatal(err)
+			}
+			b := &memBucket{objs: map[string][]byte{}}
+			archiveTo(t, b)
+			s := New()
+			body := `{"model":"fake/m1","messages":[{"role":"user","content":"send it to ` + tc.requestKey + `"}]}`
+			rec := httptest.NewRecorder()
+			s.Handler().ServeHTTP(rec, httptest.NewRequest("POST", "/v1/chat/completions", strings.NewReader(body)))
+			archivePending.Wait()
+			if rec.Code != 200 || !strings.Contains(rec.Body.String(), tc.replyKey) {
+				t.Fatalf("the agent did not get the reply key: %d %s", rec.Code, rec.Body)
+			}
+			data, ok := b.objs["archive/"+s.Recent()[0].Archive+".json"]
+			if !ok || len(b.objs) != 1 {
+				t.Fatalf("uploaded %v", keys(b.objs))
+			}
+			var a Archived
+			if err := json.Unmarshal(data, &a); err != nil {
+				t.Fatal(err)
+			}
+			if tc.redact {
+				if strings.Contains(a.Request.Body, tc.requestKey) || !strings.Contains(a.Request.Body, "{{RELAY_") {
+					t.Errorf("the archived request: %s", a.Request.Body)
+				}
+				if strings.Contains(a.Response.Body, tc.replyKey) {
+					t.Errorf("the user rule's key is in the archived reply: %s", a.Response.Body)
+				}
+			} else {
+				if !strings.Contains(a.Request.Body, tc.requestKey) || !strings.Contains(a.Response.Body, tc.replyKey) {
+					t.Errorf("masking off, the archive lost the key: request %s reply %s", a.Request.Body, a.Response.Body)
+				}
+			}
+		})
+	}
 }

@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/yetone/magpie/internal/redact"
 	"github.com/yetone/magpie/internal/settings"
 )
 
@@ -195,6 +196,41 @@ func TestGatewayConversationLimitsAndExpiry(t *testing.T) {
 	tr, _ = GatewayTranscript("pi", "s")
 	if tr.Captured != 1 {
 		t.Fatal("expired turn accepted")
+	}
+}
+
+// The lower-level gateway conversation store scrubs the user's own rules too,
+// not only magpie's built-in secrets.
+func TestGatewayConversationSaveScrubsUsersRuleWhenSecretsMasked(t *testing.T) {
+	gatewayHome(t)
+	if err := SetGatewayRecording(true, false); err != nil {
+		t.Fatal(err)
+	}
+	const key = "rz_GatewayStoreKey1234567"
+	if err := settings.Save(settings.Settings{GatewayConversations: true, Redact: true,
+		RedactRules: []redact.Rule{{Kind: "RELAY", Prefix: "rz_"}}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := SaveGatewayTurn(GatewayTurn{Agent: "pi", Session: "s", Time: time.Now(),
+		Output: []Part{{Role: "assistant", Kind: "text", Text: "using " + key}}}); err != nil {
+		t.Fatal(err)
+	}
+	tr, err := GatewayTranscript("pi", "s")
+	if err != nil || len(tr.Parts) != 1 || strings.Contains(tr.Parts[0].Text, key) || !strings.Contains(tr.Parts[0].Text, "[REDACTED:RELAY]") {
+		t.Fatalf("masking on, the stored conversation: %+v %v", tr, err)
+	}
+	if err := settings.Save(settings.Settings{GatewayConversations: true,
+		RedactRules: []redact.Rule{{Kind: "RELAY", Prefix: "rz_"}}}); err != nil {
+		t.Fatal(err)
+	}
+	const kept = "rz_GatewayStoreKey7654321"
+	if err := SaveGatewayTurn(GatewayTurn{Agent: "pi", Session: "s", Time: time.Now().Add(time.Second),
+		Output: []Part{{Role: "assistant", Kind: "text", Text: "using " + kept}}}); err != nil {
+		t.Fatal(err)
+	}
+	tr, err = GatewayTranscript("pi", "s")
+	if err != nil || len(tr.Parts) != 2 || !strings.Contains(tr.Parts[1].Text, kept) {
+		t.Fatalf("masking off, the stored conversation lost the key: %+v %v", tr, err)
 	}
 }
 

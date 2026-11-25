@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/yetone/magpie/internal/access"
+	"github.com/yetone/magpie/internal/redact"
 	"github.com/yetone/magpie/internal/settings"
 )
 
@@ -113,5 +114,36 @@ func TestKeyRedactEveryRoute(t *testing.T) {
 	q, _ := maskedQuery(context.Background(), "news about acmecorp", nil)
 	if strings.Contains(q, "acmecorp") {
 		t.Errorf("a request with no key went unmasked: %q", q)
+	}
+}
+
+// What a request keeps takes the user's rules only where its key's masking
+// has them on: on forces them, off removes them, and follow takes the setting.
+func TestScrubOptionsFollowKeyMasking(t *testing.T) {
+	fresh(t)
+	rules := []redact.Rule{{Kind: "RELAY", Prefix: "rz_"}}
+	for _, tc := range []struct {
+		name   string
+		redact bool
+		mode   string
+		want   bool
+	}{
+		{"settings_off_key_on", false, access.RedactOn, true},
+		{"settings_off_key_off", false, access.RedactOff, false},
+		{"settings_off_follow", false, "", false},
+		{"settings_on_key_off", true, access.RedactOff, false},
+		{"settings_on_key_on", true, access.RedactOn, true},
+		{"settings_on_follow", true, "", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := settings.Save(settings.Settings{Redact: tc.redact, RedactRules: rules}); err != nil {
+				t.Fatal(err)
+			}
+			ctx := access.WithIdentity(context.Background(), access.Identity{Redact: tc.mode})
+			o := scrubOptionsFor(ctx)
+			if got := len(o.Rules) > 0; got != tc.want {
+				t.Errorf("rules %v, want %v: %+v", got, tc.want, o)
+			}
+		})
 	}
 }

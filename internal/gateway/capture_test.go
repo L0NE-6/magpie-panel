@@ -4,6 +4,9 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/yetone/magpie/internal/redact"
+	"github.com/yetone/magpie/internal/settings"
 )
 
 func TestCaptureRequestBodyLimit(t *testing.T) {
@@ -38,5 +41,27 @@ func TestCaptureResponseWriterPreservesResponse(t *testing.T) {
 	}
 	if got := r.Body.String(); got != `{"ok":true}` {
 		t.Fatalf("response = %q", got)
+	}
+}
+
+// A body the gateway's OTLP export carries loses a user rule's key while
+// Mask secrets is on, and keeps it while the rule is off.
+func TestBodyForExportScrubsTheUsersRuleWhenSecretsAreMasked(t *testing.T) {
+	fresh(t)
+	const key = "rz_ExportKey1234567"
+	body := `{"choices":[{"message":{"content":"using ` + key + `"}}]}`
+	if err := settings.Save(settings.Settings{Redact: true,
+		RedactRules: []redact.Rule{{Kind: "RELAY", Prefix: "rz_"}}}); err != nil {
+		t.Fatal(err)
+	}
+	if got := bodyForExport(body, false); strings.Contains(got, key) || !strings.Contains(got, "[REDACTED:RELAY]") {
+		t.Errorf("masking on, the exported body: %s", got)
+	}
+	if err := settings.Save(settings.Settings{
+		RedactRules: []redact.Rule{{Kind: "RELAY", Prefix: "rz_"}}}); err != nil {
+		t.Fatal(err)
+	}
+	if got := bodyForExport(body, false); !strings.Contains(got, key) {
+		t.Errorf("masking off, the exported body lost the key: %s", got)
 	}
 }

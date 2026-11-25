@@ -56,8 +56,7 @@ func WithForced(ctx context.Context) context.Context {
 // route ctx has (WithRoute).
 func optionsCtx(ctx context.Context) redact.Options {
 	st := settings.Shared()
-	o := redact.Options{Secrets: st.Redact, Personal: st.RedactPersonal, Kinds: st.RedactKinds, Words: st.RedactWords, WordsAnyCase: st.RedactWordsAnyCase, WordsWhole: st.RedactWordsWhole, Rules: st.RedactRules,
-		Actions: st.RedactActions, Allow: st.RedactAllow, Shape: st.RedactShape}
+	o := st.Redaction()
 	o.Route, _ = ctx.Value(routeKey{}).(string)
 	if forced, _ := ctx.Value(forcedKey{}).(bool); forced && !Wanted(st) {
 		o.Secrets, o.Personal = true, true

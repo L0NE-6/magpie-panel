@@ -86,6 +86,7 @@ func saveGatewayTurn(turn GatewayTurn, generation uint64) error {
 	if turn.Time.Before(time.Now().Add(-GatewayRetention)) {
 		return nil
 	}
+	o := settings.Shared().Scrubbing()
 	bound := func(parts []Part) []Part {
 		left := 64 << 10 // Each direction gets its own budget; history cannot crowd out the reply.
 		out := []Part{}
@@ -94,8 +95,8 @@ func saveGatewayTurn(turn GatewayTurn, generation uint64) error {
 				turn.Cut = true
 				break
 			}
-			p.Text = string(redact.ScrubJSON([]byte(p.Text)))
-			p.Name = redact.Scrub(p.Name)
+			p.Text = string(redact.ScrubJSONWith([]byte(p.Text), o))
+			p.Name = redact.ScrubWith(p.Name, o)
 			if len(p.Text) > min(left, 64<<10) {
 				n := min(left, 64<<10)
 				for n > 0 && !utf8.ValidString(p.Text[:n]) {

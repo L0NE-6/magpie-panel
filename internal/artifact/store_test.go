@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func sandbox(t *testing.T) string {
@@ -111,6 +112,14 @@ func TestListAndDelete(t *testing.T) {
 	dir := sandbox(t)
 	a, _ := PublishPage(Publish{Page: []byte("a"), Title: "First"})
 	b, _ := PublishPage(Publish{Page: []byte("b"), Title: "Second"})
+	// Updated is truncated to milliseconds. Wait for the clock to move past
+	// b's timestamp, so this tests "most recently updated first" rather than
+	// whichever random ID sorts first when both timestamps are equal (#7755).
+	for until := time.Now().Add(time.Second); !time.Now().UTC().Truncate(time.Millisecond).After(b.Updated); time.Sleep(time.Millisecond) {
+		if time.Now().After(until) {
+			t.Fatalf("clock did not move past %s", b.Updated)
+		}
+	}
 	PublishPage(Publish{ID: a.ID, Page: []byte("a2")})
 	// a folder with no meta.json (a publish cut short) isn't listed
 	os.MkdirAll(filepath.Join(dir, strings.Repeat("a", 26)), 0o700)

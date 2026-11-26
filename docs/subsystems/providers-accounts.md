@@ -235,7 +235,9 @@ magpie) gets its System One at `AIStudioGemini` too (`googleDecisions`):
 Google's Decisions API (`POST /v1beta/decisions`, `ViaGoogle`) serves
 `gemini-decision-1` on the same key, which goes as `x-goog-api-key`
 (`DecideProtocol`), never as a Bearer token. Google takes System One's
-questions as they are, with a choice's undescribed option as `""`; the
+questions as they are, with a choice's undescribed option as `""` and a
+`noul` question's short `true`/`false` criteria sent as Google's
+`true_description`/`false_description`; the
 state goes as `input`, a string as it is and an object as its JSON text
 (an object would be read as a content block), and the images as image
 blocks after it (`googleAsk`). The answer's usage

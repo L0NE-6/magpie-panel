@@ -66,6 +66,9 @@ func sameJSON(t *testing.T, what string, got []byte, want string) {
 func TestGoogleDecideWire(t *testing.T) {
 	ask := strings.Replace(googleNoulAsk, `"input"`, `"state"`, 1)
 	sameJSON(t, "text state", DecideAsk(ViaGoogle, GoogleDecision, []byte(ask)), googleNoulAsk)
+	shortNoul := strings.Replace(googleNoulAsk, `"true_description"`, `"true"`, 1)
+	shortNoul = strings.Replace(shortNoul, `"false_description"`, `"false"`, 1)
+	sameJSON(t, "short noul criteria", DecideAsk(ViaGoogle, GoogleDecision, []byte(strings.Replace(shortNoul, `"input"`, `"state"`, 1))), googleNoulAsk)
 	obj := `{"model":"gemini-decision-1","state":{"message":"fix the build","previous_message_kind":"coding"},"questions":{"intent":{"type":"choice","instructions":"Which?","criteria":{"coding":null,"chat":"small talk"}}},"images":["data:image/png;base64,iVBORw0KGgo=","https://example.com/a.jpg"]}`
 	sameJSON(t, "object state", DecideAsk(ViaGoogle, GoogleDecision, []byte(obj)),
 		`{"model":"gemini-decision-1","input":[{"type":"text","text":"{\"message\":\"fix the build\",\"previous_message_kind\":\"coding\"}"},{"type":"image","data":"iVBORw0KGgo=","mime_type":"image/png"},{"type":"image","uri":"https://example.com/a.jpg"}],"questions":{"intent":{"type":"choice","instructions":"Which?","criteria":{"coding":"","chat":"small talk"}}}}`)

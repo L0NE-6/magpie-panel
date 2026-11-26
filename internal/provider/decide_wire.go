@@ -155,17 +155,42 @@ func googleAsk(q map[string]any, body []byte) []byte {
 	if qs, ok := q["questions"].(map[string]any); ok {
 		for _, v := range qs {
 			x, _ := v.(map[string]any)
-			if c, ok := x["criteria"].(map[string]any); ok && x["type"] == "choice" {
+			c, ok := x["criteria"].(map[string]any)
+			if !ok {
+				continue
+			}
+			switch x["type"] {
+			case "choice":
 				for k, d := range c {
 					if d == nil {
 						c[k] = ""
 					}
 				}
+			case "noul":
+				googleNoulCriteria(c)
 			}
 		}
 	}
 	b, _ := json.Marshal(q)
 	return b
+}
+
+// googleNoulCriteria gives a noul question the names Google's Decisions API
+// uses. Pi and System One callers may use the shorter true/false keys.
+func googleNoulCriteria(c map[string]any) {
+	for _, pair := range [][2]string{
+		{"true", "true_description"},
+		{"false", "false_description"},
+	} {
+		value, ok := c[pair[0]]
+		if !ok {
+			continue
+		}
+		if _, exists := c[pair[1]]; !exists {
+			c[pair[1]] = value
+		}
+		delete(c, pair[0])
+	}
 }
 
 // DecideResult is a decision API's answer, status and body, as System

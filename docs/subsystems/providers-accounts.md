@@ -446,7 +446,9 @@ by `OwnModelID`: a plugin's model (`pluginModel`, so its API, tiers and
 prices), Claude Code's run on a Claude account, Code Assist's and
 Antigravity's variant (`codeAssistBody`, `SentNameOnIn`), and an
 account's own list, levels and tiers (`Account.Lists` in the fallback,
-`Levels`, `Tiers`, `AccountServes`). One id is one model of a provider: the latest given it has it,
+`Levels`, `Tiers`, `AccountServes`). A decision-only model is exempt from
+an account's list because the model picker cannot list it. One id is one
+model of a provider: the latest given it has it,
 and the one before is listed by its own id again (the CLI names it; the
 editor refuses two rows given one id in one save). A model of the
 provider's own id that another is listed by (`grok-4.6` beside

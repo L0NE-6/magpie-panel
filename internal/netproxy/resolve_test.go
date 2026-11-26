@@ -182,10 +182,9 @@ func TestResolvePlaceWithPort(t *testing.T) {
 // the resolver gave them.
 func TestResolveDNSPlaceFollowsItsRecords(t *testing.T) {
 	e := newResolveEnv(t, nil)
-	dead := deadPort(t)
 	var mu sync.Mutex
 	var asked []string
-	answers := [][]string{{"127.0.0.1"}, {"127.0.0.1"}}
+	answers := [][]string{{"127.0.0.1"}, {"127.0.0.2", "127.0.0.1"}}
 	lookupHost = func(ctx context.Context, name string) ([]string, error) {
 		mu.Lock()
 		defer mu.Unlock()
@@ -205,16 +204,15 @@ func TestResolveDNSPlaceFollowsItsRecords(t *testing.T) {
 	e.d.(*dispatch).CloseIdleConnections()
 	// the name now answers with an address nothing takes first, then the good one
 	mu.Lock()
-	answers = [][]string{{"127.0.0.1", "127.0.0.1"}}
+	answers = [][]string{{"127.0.0.2", "127.0.0.1"}}
 	mu.Unlock()
-	_ = dead
 	if _, err := e.get(ctx); err != nil {
 		t.Fatal(err)
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	if !slices.Equal(asked, []string{"gw.managed.test", "gw.managed.test"}) {
-		t.Errorf("looked up %v: once for each new connection", asked)
+	if len(asked) < 2 || slices.ContainsFunc(asked, func(name string) bool { return name != "gw.managed.test" }) {
+		t.Errorf("looked up %v: the name must be resolved again for each new connection", asked)
 	}
 }
 

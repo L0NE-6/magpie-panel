@@ -235,7 +235,9 @@ magpie) gets its System One at `AIStudioGemini` too (`googleDecisions`):
 Google's Decisions API (`POST /v1beta/decisions`, `ViaGoogle`) serves
 `gemini-decision-1` on the same key, which goes as `x-goog-api-key`
 (`DecideProtocol`), never as a Bearer token. Google takes System One's
-questions as they are, with a choice's undescribed option as `""`; the
+questions as they are, with a choice's undescribed option as `""` and a
+`noul` question's short `true`/`false` criteria sent as Google's
+`true_description`/`false_description`; the
 state goes as `input`, a string as it is and an object as its JSON text
 (an object would be read as a content block), and the images as image
 blocks after it (`googleAsk`). The answer's usage
@@ -446,7 +448,9 @@ by `OwnModelID`: a plugin's model (`pluginModel`, so its API, tiers and
 prices), Claude Code's run on a Claude account, Code Assist's and
 Antigravity's variant (`codeAssistBody`, `SentNameOnIn`), and an
 account's own list, levels and tiers (`Account.Lists` in the fallback,
-`Levels`, `Tiers`, `AccountServes`). One id is one model of a provider: the latest given it has it,
+`Levels`, `Tiers`, `AccountServes`). A decision-only model is exempt from
+an account's list when the model picker cannot list it. One id is one
+model of a provider: the latest given it has it,
 and the one before is listed by its own id again (the CLI names it; the
 editor refuses two rows given one id in one save). A model of the
 provider's own id that another is listed by (`grok-4.6` beside

@@ -66,7 +66,9 @@ func sameJSON(t *testing.T, what string, got []byte, want string) {
 func TestGoogleDecideWire(t *testing.T) {
 	ask := strings.Replace(googleNoulAsk, `"input"`, `"state"`, 1)
 	sameJSON(t, "text state", DecideAsk(ViaGoogle, GoogleDecision, []byte(ask)), googleNoulAsk)
-
+	shortNoul := strings.Replace(googleNoulAsk, `"true_description"`, `"true"`, 1)
+	shortNoul = strings.Replace(shortNoul, `"false_description"`, `"false"`, 1)
+	sameJSON(t, "short noul criteria", DecideAsk(ViaGoogle, GoogleDecision, []byte(strings.Replace(shortNoul, `"input"`, `"state"`, 1))), googleNoulAsk)
 	obj := `{"model":"gemini-decision-1","state":{"message":"fix the build","previous_message_kind":"coding"},"questions":{"intent":{"type":"choice","instructions":"Which?","criteria":{"coding":null,"chat":"small talk"}}},"images":["data:image/png;base64,iVBORw0KGgo=","https://example.com/a.jpg"]}`
 	sameJSON(t, "object state", DecideAsk(ViaGoogle, GoogleDecision, []byte(obj)),
 		`{"model":"gemini-decision-1","input":[{"type":"text","text":"{\"message\":\"fix the build\",\"previous_message_kind\":\"coding\"}"},{"type":"image","data":"iVBORw0KGgo=","mime_type":"image/png"},{"type":"image","uri":"https://example.com/a.jpg"}],"questions":{"intent":{"type":"choice","instructions":"Which?","criteria":{"coding":"","chat":"small talk"}}}}`)
@@ -165,6 +167,7 @@ func TestGoogleKeyDecides(t *testing.T) {
 		t.Fatal(err)
 	}
 	g.Key, g.Models = "AIza-test", []string{"gemini-3.5-flash"}
+	g.AccountModels = map[string][]string{keyID(g.Key): {"gemini-3.5-flash"}}
 	or, err := FromPreset("openrouter")
 	if err != nil {
 		t.Fatal(err)
@@ -199,6 +202,12 @@ func TestGoogleKeyDecides(t *testing.T) {
 	}
 	if p.DecideVia() != ViaGoogle || p.Jev() != GoogleDecision || !p.DecidesModel(GoogleDecision) || p.DecidesModel("gemini-3.5-flash") {
 		t.Fatalf("google: via %s, asked with %s", p.DecideVia(), p.Jev())
+	}
+	if !p.AccountServes(keyID(g.Key), GoogleDecision) {
+		t.Fatal("the key's own model list bars Google's decision-only model")
+	}
+	if p.AccountServes(keyID(g.Key), "gemini-4-unlisted") {
+		t.Fatal("the key's own model list serves a model it leaves out")
 	}
 	if ms := p.decideModels(); len(ms) != 1 || ms[0].Context != 262_144 || ms[0].ImageInput == nil || !*ms[0].ImageInput {
 		t.Fatalf("decision models: %+v", ms)

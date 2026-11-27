@@ -1,14 +1,26 @@
 # Upstream Audit
 
-Snapshot: 2026-11-26. Upstream remains
+Snapshot: 2026-11-27. Upstream remains
 [`yetone/magpie`](https://github.com/yetone/magpie). The fork `main` is an
 exact mirror; `panel` contains maintenance documentation, the upstream-sync
 workflow, and verified local integrations. Upstream `main` is at
-`6346f383`.
+`fd233eff`.
 
 ## Upstream Sync
 
-The panel now also includes the latest upstream changes:
+The 2026-11-27 panel sync includes every upstream commit through
+`fd233eff`. Its provider and gateway changes include:
+
+- `044e9bd2`: a key's model list never bars the vendor's own decision model
+  (#7788);
+- `de487aec`: Google `noul` criteria use `true_description` and
+  `false_description` (#7789);
+- `d20f306f`: `/v1/systemone` accepts `audio` for Google's Decisions API
+  (#7790);
+- `fd233eff`: an MCP server edit writes only that server's files and returns
+  its updated part.
+
+The 2026-11-26 panel sync retains these upstream changes:
 
 - `6346f383`: a private-network Remote magpie address proves it holds the
   gateway key before a keyed request is sent to it;
@@ -56,8 +68,9 @@ the shared session listing and transcript switches.
 
 | Issue | Current state | Verification |
 | :--- | :--- | :--- |
-| [#7788](https://github.com/yetone/magpie/issues/7788) | Open upstream; integrated in panel through [PR #3](https://github.com/L0NE-6/magpie-panel/pull/3) on `fix/7788-7789-google-decisions`, refreshed from `panel@17666ad2` | A provider's decision-only model is exempt from the account/key model list when that list cannot contain it, while a genuinely unlisted chat model and an explicitly excluded listable decision model are still barred. `TestGoogleKeyDecides`, `TestGatewayKeyAccountsSystemOne` and the Google gateway route pass after the panel merge; `go vet ./internal/provider ./internal/gateway` and `git diff --check` pass. The [existing upstream evidence comment](https://github.com/yetone/magpie/issues/7788#issuecomment-7182469310) remains accessible, and the issue remains open. No live Google key was used. |
-| [#7789](https://github.com/yetone/magpie/issues/7789) | Open upstream; integrated in panel through [PR #3](https://github.com/L0NE-6/magpie-panel/pull/3) on `fix/7788-7789-google-decisions`, refreshed from `panel@17666ad2` | Google `noul` criteria now map short `true` / `false` keys to `true_description` / `false_description`, while existing long-form criteria and choice/score questions stay unchanged. `TestGoogleDecideWire` and `TestGoogleSystemOne` pass after the panel merge; `go vet ./internal/provider ./internal/gateway` and `git diff --check` pass. The [existing upstream evidence comment](https://github.com/yetone/magpie/issues/7789#issuecomment-7182470358) remains accessible, and the issue remains open. No live Google key was used. |
+| [#7788](https://github.com/yetone/magpie/issues/7788) | Fixed upstream in `044e9bd2`; the 2026-11-27 panel sync adopts the upstream implementation | A provider's decision-only model is exempt from the account/key model list when that list cannot contain it, while a genuinely unlisted chat model and an explicitly excluded listable decision model are still barred. `TestGoogleKeyDecides`, `TestGoogleDecisionKeyLists` and `TestGatewayKeyAccountsSystemOne` pass after the panel merge. The [existing upstream evidence comment](https://github.com/yetone/magpie/issues/7788#issuecomment-7182469310) remains accessible. No live Google key was used. |
+| [#7789](https://github.com/yetone/magpie/issues/7789) | Fixed upstream in `de487aec`; the 2026-11-27 panel sync adopts the upstream implementation | Google `noul` criteria map short `true` / `false` keys to `true_description` / `false_description`, while existing long-form criteria and choice/score questions stay unchanged. `TestGoogleDecideWire`, `TestGoogleSystemOne` and `TestGoogleSystemOneNoulAndAudio` pass after the panel merge. The [existing upstream evidence comment](https://github.com/yetone/magpie/issues/7789#issuecomment-7182470358) remains accessible. No live Google key was used. |
+| [#7790](https://github.com/yetone/magpie/issues/7790) | Fixed upstream in `d20f306f`; the 2026-11-27 panel sync includes the upstream implementation | `/v1/systemone` accepts `audio` and sends it to Google as an audio block after validating the model and MIME type. `TestSystemOneAudio` and `TestGoogleDecisionsTakesImages` pass after the panel merge. No live Google audio request was made. |
 | [#7772](https://github.com/yetone/magpie/issues/7772) | Integrated in panel as `1475f3f`; [clean upstream branch](https://github.com/L0NE-6/magpie-panel/tree/fix/7772-stream-tool-args) | Streamed Chat tool-call arguments now repair bare glob/path strings with a JSON state machine, preserving healthy JSON and escaping Windows backslashes. Focused gateway tests, race and vet pass; no live GLM/DeepSeek account was exercised. |
 | [#7771](https://github.com/yetone/magpie/issues/7771) | Integrated in panel as `7e9dc7e`; [clean upstream branch](https://github.com/L0NE-6/magpie-panel/tree/fix/7771-gemini-omni-video) | Gemini Omni Flash now enters the video list and `/v1/videos` translates create/poll/content through the Interactions API, validating duration, aspect ratio, resolution and terminal video content. Focused gateway tests and cross-platform vet pass; no live Gemini API key produced a real video. |
 | [#7770](https://github.com/yetone/magpie/issues/7770) | Integrated in panel as `8a654ae`; [clean upstream branch](https://github.com/L0NE-6/magpie-panel/tree/fix/7770-opencode-decision) | OpenCode Go's `type: "decision"` rows now carry Jev 1.14, Gemini Decision 1 and GPT-6 Luna Decision into System One routing groups while staying out of agent chat pickers. The preset and saved providers get the System One base; catalog/provider focused tests and vet pass. |

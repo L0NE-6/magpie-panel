@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -17,7 +18,13 @@ func sandbox(t *testing.T) string {
 	dir := t.TempDir()
 	old := Dir
 	Dir = func() string { return dir }
-	t.Cleanup(func() { Dir = old })
+	// before the folder goes: Windows won't remove a data.db still open
+	t.Cleanup(func() {
+		// a shared copy's asset sync ends with the test
+		assetSyncs.Wait()
+		Dir = old
+		CloseDBs()
+	})
 	return dir
 }
 
@@ -136,59 +143,64 @@ func TestListAndDelete(t *testing.T) {
 	}
 }
 
-// Two publishes in one millisecond, or after the wall clock moves back,
-// still get distinct timestamps in publish order (#7757).
-func TestPublishTimestampsFollowPublishOrder(t *testing.T) {
+// The list's order says which artifact was published last, even when the
+// clock stands still between the publishes: the stamps never tie, so the
+// order never falls to the ids, which are random (#7755 — the list of two
+// artifacts published in the same millisecond was a coin toss, and the
+// CLI's list with it, #7757).
+func TestListOrderSurvivesAClockThatStandsStill(t *testing.T) {
 	sandbox(t)
-	fixed := time.Date(2026, 11, 26, 1, 0, 0, 0, time.UTC)
-	oldClock := clock
-	clock = func() time.Time { return fixed }
-	t.Cleanup(func() { clock = oldClock })
+	was := clock
+	clock = func() time.Time { return time.Date(2026, 11, 26, 1, 0, 0, 0, time.UTC) }
+	defer func() { clock = was }()
+	a, _ := PublishPage(Publish{Page: []byte("a"), Title: "First"})
+	b, _ := PublishPage(Publish{Page: []byte("b"), Title: "Second"})
+	PublishPage(Publish{ID: a.ID, Page: []byte("a2")})
+	l, err := List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(l) != 2 {
+		t.Fatalf("listed %+v", l)
+	}
+	if l[0].Updated.Equal(l[1].Updated) {
+		t.Fatalf("the stamps tie, so the order is the ids': %+v", l)
+	}
+	if l[0].ID != a.ID || l[1].ID != b.ID {
+		t.Fatalf("listed %+v, want %s first", l, a.ID)
+	}
+}
 
-	a, err := PublishPage(Publish{Page: []byte("a")})
+// Pages published in one millisecond are listed in the order they were
+// published, newest first, not by their random ids (#7755, #7757); a
+// clock that went back doesn't put a publish behind the last one.
+func TestListFollowsPublishOrder(t *testing.T) {
+	sandbox(t)
+	at := time.Date(2026, 11, 26, 12, 0, 0, 0, time.UTC)
+	old := clock
+	clock = func() time.Time { return at }
+	t.Cleanup(func() { clock = old })
+	var ids []string
+	for i := range 8 {
+		if i == 6 {
+			at = at.Add(-time.Hour)
+		}
+		a, err := PublishPage(Publish{Page: []byte{'a' + byte(i)}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		ids = append([]string{a.ID}, ids...)
+	}
+	l, err := List()
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err := PublishPage(Publish{Page: []byte("b")})
-	if err != nil {
-		t.Fatal(err)
+	var got []string
+	for _, a := range l {
+		got = append(got, a.ID)
 	}
-	if !b.Updated.After(a.Updated) {
-		t.Fatalf("same-millisecond publishes kept the wall-clock tie: a=%s b=%s", a.Updated, b.Updated)
-	}
-	listed, err := List()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(listed) != 2 || listed[0].ID != b.ID || listed[1].ID != a.ID {
-		t.Fatalf("same-millisecond list order: %+v", listed)
-	}
-
-	a2, err := PublishPage(Publish{ID: a.ID, Page: []byte("a2")})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !a2.Updated.After(b.Updated) {
-		t.Fatalf("an update kept the wall-clock tie: update=%s newest=%s", a2.Updated, b.Updated)
-	}
-	listed, err = List()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(listed) != 2 || listed[0].ID != a.ID || listed[1].ID != b.ID {
-		t.Fatalf("update list order: %+v", listed)
-	}
-
-	// A new process has an empty in-memory clock; the files still tell it
-	// where publish order ended.
-	publishClock.dir = ""
-	publishClock.last = time.Time{}
-	c, err := PublishPage(Publish{Page: []byte("c")})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !c.Updated.After(a2.Updated) {
-		t.Fatalf("a restarted process reused a timestamp: new=%s previous=%s", c.Updated, a2.Updated)
+	if !slices.Equal(got, ids) {
+		t.Fatalf("listed %v, want newest first %v", got, ids)
 	}
 }
 

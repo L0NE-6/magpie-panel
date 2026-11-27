@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -285,47 +286,51 @@ func TestMCPProxyRefusedAfterRenewalRunsOut(t *testing.T) {
 	}
 }
 
-// A GET's stream may sit silent before its first event, and an agent's
-// handshake waits on its headers alone: net/http holds a response's
-// headers until its body is written, so the proxy has to flush them
-// itself (#7744).
+// A server's GET event stream that sends nothing yet (it has no
+// notification for the client) reaches the agent with its headers at once,
+// as agy's MCP client waits on them before it finishes connecting; its
+// events then come as they are sent. The same through a key held to some
+// of the server's tools, whose answers go through mcpToolsFilter
+// (wjhwjhn, #7744).
 func TestMCPProxyFlushesSilentGETStreamHeaders(t *testing.T) {
-	for _, c := range []struct {
+	for _, tc := range []struct {
 		name string
-		held bool
+		key  func(t *testing.T) string
 	}{
-		{"direct", false},
-		{"restricted_key", true},
+		{"no key", func(*testing.T) string { return Token }},
+		{"key held to a tool", func(t *testing.T) string { return keyHeldToMCP(t, "Some", "neon/run_sql") }},
 	} {
-		t.Run(c.name, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			fresh(t)
 			f := mcpauthtest.New(t)
-			f.SilentGET = true
+			hold := make(chan struct{})
+			var once sync.Once
+			release := func() { once.Do(func() { close(hold) }) }
+			f.HoldGet = hold
 			f.SignIn(t, "neon")
-			secret := ""
-			if c.held {
-				secret = keyHeldToMCP(t, "neon-holder", "neon")
-			}
-			gw := httptest.NewServer(New().Handler())
+			gw := httptest.NewServer(lanGuard(New().Handler()))
 			defer gw.Close()
+			// before gw.Close, which waits for the held stream's handler
+			defer release()
 
 			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 			defer cancel()
-			req, err := http.NewRequestWithContext(ctx, http.MethodGet, gw.URL+"/mcp/neon", nil)
-			if err != nil {
-				t.Fatal(err)
-			}
+			req, _ := http.NewRequestWithContext(ctx, http.MethodGet, gw.URL+"/mcp/neon", nil)
 			req.Header.Set("Accept", "text/event-stream")
-			if c.held {
-				req.Header.Set("Authorization", "Bearer "+secret)
-			}
+			req.Header.Set("Mcp-Session-Id", "sess-1")
+			req.Header.Set("Authorization", "Bearer "+tc.key(t))
 			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
-				t.Fatalf("GET /mcp/neon blocked waiting for headers: %v", err)
+				t.Fatalf("the stream's headers never came while the server sent nothing: %v", err)
 			}
 			defer resp.Body.Close()
 			if resp.StatusCode != http.StatusOK || !strings.HasPrefix(resp.Header.Get("Content-Type"), "text/event-stream") {
 				t.Fatalf("GET: %d %v", resp.StatusCode, resp.Header)
+			}
+			release()
+			rd := bufio.NewReader(resp.Body)
+			if first, err := rd.ReadString('\n'); err != nil || first != "id: 1\n" {
+				t.Fatalf("the stream after its headers: %q %v", first, err)
 			}
 		})
 	}

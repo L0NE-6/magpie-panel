@@ -31,6 +31,8 @@ func cindyApp(t *testing.T, h, bundle string) {
 // ~/.codex's file isn't touched for it.
 func TestCindyMCP(t *testing.T) {
 	h := sandbox(t)
+	// a Mac finds Cindy by its app as well as its folder (#7766)
+	holdApp(t, h, "Cindy.app", "com.xd.cindycn")
 	t.Setenv("APPDATA", filepath.Join(h, "AppData", "Roaming"))
 	cfg, err := os.UserConfigDir()
 	if err != nil {
@@ -93,6 +95,8 @@ func TestCindyMCP(t *testing.T) {
 // read, which a later session finds.
 func TestCindyMCPBeforeCodexRan(t *testing.T) {
 	h := sandbox(t)
+	// a Mac finds Cindy by its app as well as its folder (#7766)
+	holdApp(t, h, "Cindy.app", "com.xd.cindycn")
 	t.Setenv("APPDATA", filepath.Join(h, "AppData", "Roaming"))
 	cfg, err := os.UserConfigDir()
 	if err != nil {

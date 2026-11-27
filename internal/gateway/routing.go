@@ -2351,12 +2351,14 @@ func backingOff(key string, now time.Time) bool {
 	return ok && now.Before(until) && restingUntil.note[key].Why == failOther
 }
 
-// freeRateAlone says whether a rate limit is the model's alone because
-// it is a free model beside paid ones (OpenCode Go's hy4-flash-free beside
-// glm-5.3, xzhih on X): its rest, its backoff count and its sink are kept
-// to the model, so the paid models the key still has room for go on.
+// freeRateAlone says whether an OpenCode rate limit is the model's alone
+// because it is a free model beside paid ones (OpenCode Go's hy4-flash-free
+// beside glm-5.3, xzhih on X): its rest, its backoff count and its sink are
+// kept to the model, so the paid models the key still has room for go on.
+// Other vendors' free markers keep a credit or quota refusal scoped by
+// FreeBesidePaid; a plain rate limit that names no model stays the key's.
 func freeRateAlone(c candidate, why string) bool {
-	return why == failRate && c.p.FreeBesidePaid(c.model)
+	return why == failRate && c.p.IsOpenCode() && c.p.FreeBesidePaid(c.model)
 }
 
 // vendorSaidWhen says whether a 429's headers or body name a time it is

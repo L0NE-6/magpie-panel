@@ -362,7 +362,7 @@ func (p Provider) paidOnly(ws []QuotaWindow) []QuotaWindow {
 	if len(ws) > 0 && clineKeyCard(p) {
 		return clinePassOnly(ws)
 	}
-	if len(ws) == 0 || !(p.atOpenCodeGo() || p.kiloWindowed() || p.IsOpenRouter()) {
+	if len(ws) == 0 || !(p.atOpenCodeGo() || p.clineWindowed() || p.kiloWindowed() || p.IsOpenRouter()) {
 		return ws
 	}
 	return windowPaidOnly(ws, p.freeModelIDs())

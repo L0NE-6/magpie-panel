@@ -31,6 +31,7 @@ func TestClaudeDirAnotherToolsSettingsIsNoClaude(t *testing.T) {
 	}
 	// a folder of Claude Code's by each of the other signs
 	writeFile(t, filepath.Join(home, ".claude-work", "settings.json"), `{"theme":"dark"}`)
+	writeFile(t, filepath.Join(home, ".claude-json", ".claude.json"), `{}`)
 	writeFile(t, filepath.Join(home, ".claude-creds", ".credentials.json"), `{}`)
 	writeFile(t, filepath.Join(home, ".claude-proj", "projects", "p", "s.jsonl"), `{}`)
 	// settings.json by the name, but nothing of Claude Code's in it
@@ -45,7 +46,7 @@ func TestClaudeDirAnotherToolsSettingsIsNoClaude(t *testing.T) {
 	for _, a := range claudeDirAgents(home) {
 		got[a.ID] = a
 	}
-	want := []string{"claude#work", "claude#creds", "claude#proj", "claude#magpie-desktop"}
+	want := []string{"claude#work", "claude#json", "claude#creds", "claude#proj", "claude#magpie-desktop"}
 	for _, id := range want {
 		a := got[id]
 		if a == nil || !a.Detected() {

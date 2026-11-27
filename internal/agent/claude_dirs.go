@@ -43,14 +43,14 @@ func claudeDirName(base string) string {
 }
 
 // claudeDirIsClaude says whether dir holds what Claude Code itself keeps in
-// a config folder: its settings.json — one holding a key Claude Code
-// writes — its sign-in file, or its projects. Another tool's .claude-…
+// a config folder: its .claude.json, its sign-in file, its projects, or a
+// settings.json holding a key Claude Code writes. Another tool's .claude-…
 // folder (a router's, a launcher's) has none, and one that does keep a
-// file by the name is no Claude Code either: claude-mem's ~/.claude-mem
-// holds a settings.json of its own, all CLAUDE_MEM_* keys, and was a
-// "Claude Code · mem" row every skill was ticked on (#7749).
+// settings.json by the name is no Claude Code either: claude-mem's
+// ~/.claude-mem holds a settings.json of its own, all CLAUDE_MEM_* keys,
+// and was a "Claude Code · mem" row every skill was ticked on (#7749).
 func claudeDirIsClaude(dir string) bool {
-	for _, f := range []string{".credentials.json"} {
+	for _, f := range []string{".claude.json", ".credentials.json"} {
 		if fi, err := os.Stat(filepath.Join(dir, f)); err == nil && fi.Mode().IsRegular() {
 			return true
 		}

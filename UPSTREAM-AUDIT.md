@@ -4,12 +4,40 @@ Snapshot: 2026-11-27. Upstream remains
 [`yetone/magpie`](https://github.com/yetone/magpie). The fork `main` is an
 exact mirror; `panel` contains maintenance documentation, the upstream-sync
 workflow, and verified local integrations. Upstream `main` is at
-`fd233eff`.
+`63f724e1`.
 
 ## Upstream Sync
 
-The 2026-11-27 panel sync includes every upstream commit through
-`fd233eff`. Its provider and gateway changes include:
+The final 2026-11-27 panel sync includes every upstream commit through
+`63f724e1`. Its provider, data, gateway, agent and GUI changes include:
+
+- `9cba5928`: Factory's mover minimum is 0.1.59 and Codex's identity
+  sentences follow the plugin update;
+- `918467f6`: a held folder on Windows stops a data move before anything is
+  copied and names the holder;
+- `9d6a11e5`: the site's live-token test checks the signature's changed first
+  character instead of its padding;
+- `f8866483`: a `call_id` over 64 characters stays bound to every upstream
+  that validates it;
+- `207b3775`: Copilot CLI's `/model` offers each Magpie model's reasoning
+  effort;
+- `7e4a92ba`: the tray panel opens under Umbriel's bar at its icon;
+- `2d57fb69`: a passed-over member explains why on its routing row, and one
+  account's members count as one seat for a new session;
+- `f834c203`: a group member's try that failed before billing has a request
+  row with its status and the vendor's words;
+- `bbeb0da9`: Settings › Appearance can increase contrast to match the
+  system;
+- `94451a2b`: a session turn shows what was said with its steps folded to one
+  line;
+- `bdde26a6`: a long session's sheet reads the remaining turns when asked;
+- `7c71990b`: a session fold draws its steps when first opened;
+- `cd6d110e`: a long session's sheet counts every turn in its file; and
+- `63f724e1`: the gateway search-queue test leaves the 40 ms quiet bar to
+  `silent` alone.
+
+The earlier 2026-11-27 panel sync through `fd233eff` retains these upstream
+provider and gateway changes:
 
 - `044e9bd2`: a key's model list never bars the vendor's own decision model
   (#7788);
@@ -63,6 +91,19 @@ It also retains upstream `eab4b006` and the five commits before it:
 
 The Reasonix integration from `#1033` and CatPaw discovery are both retained in
 the shared session listing and transcript switches.
+
+### Sync Verification
+
+The focused provider set (7 tests) and the tests in the gateway files changed
+by this sync (39 tests) pass on Windows under Go 1.26.8.
+`go vet -tags nogui ./...`, `gofmt`, and `git diff --check` also pass.
+
+Two full-package boundaries were reproduced. The provider package's
+`TestRestartSwitchedCodexAppReal` emits no helper output and panics in its own
+slice indexing on this Windows host; the same test fails at the exact upstream
+commit `63f724e1`. The gateway package reaches a 25-minute suite timeout, while
+the refusal test active at the cutoff, together with all 39 tests above, passes
+in 27 seconds when run as the focused set. Neither is a merge-only regression.
 
 ## Integrated Open Issues
 

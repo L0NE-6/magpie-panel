@@ -206,9 +206,9 @@ func TestHashUnchangedByTheMemo(t *testing.T) {
 		fmt.Fprintf(x, "file SKILL.md 16\n---\nname: x\n---\nlink run scripts/run.sh\nfile scripts/run.sh 8\necho hi\n")
 		return hex.EncodeToString(x.Sum(nil))
 	}
-	for _, nf := range []bool{false, true} {
-		if got := hashFiles(d, nf); got != sum(nf) {
-			t.Errorf("noFinder %v: %s, want %s", nf, got, sum(nf))
-		}
+	// hashFiles leaves the file managers' own files out unconditionally now
+	// (SkipInSkill), so the no-Finder reading is the only one it has.
+	if got := hashFiles(d); got != sum(true) {
+		t.Errorf("hashFiles: %s, want %s", got, sum(true))
 	}
 }

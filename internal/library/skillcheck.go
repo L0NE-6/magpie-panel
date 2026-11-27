@@ -217,25 +217,22 @@ func apiGet(u string, max int64) ([]byte, int, bool, error) {
 
 // hashDir is a hash of a skill's files, their names and what's in them,
 // as copyDir copies them.
-func hashDir(dir string) string { return hashFiles(dir, false) }
+func hashDir(dir string) string { return hashFiles(dir) }
 
-// hashFiles is hashDir, leaving aside the .DS_Store files Finder leaves in
-// a folder it shows when noFinder is set. A folder unchanged since it was
-// last hashed isn't read again (treememo.go).
-func hashFiles(dir string, noFinder bool) string {
-	if noFinder {
-		return rememberedHash(dir, leaveFinder)
-	}
+// hashFiles is hashDir, leaving aside what isn't part of the skill
+// (SkipInSkill): the file managers' own files among them. A folder
+// unchanged since it was last hashed isn't read again (treememo.go).
+func hashFiles(dir string) string {
 	return rememberedHash(dir, leaveNothing)
 }
 
-// leave is what a hash of a skill's folder leaves aside, beyond its .git
-// and magpie's mark.
+// leave is what a hash of a skill's folder leaves aside, beyond what
+// SkipInSkill leaves out.
 type leave uint8
 
 const (
 	leaveNothing   leave = iota
-	leaveFinder          // .DS_Store
+	leaveFinder          // kept for the values below; SkipInSkill leaves these out already
 	leaveBuilt           // that, and what installing dependencies builds (fromInstall)
 	leaveInstalled       // that, and the lock files an install writes again
 )
@@ -252,6 +249,12 @@ func hashWalk(dir string, lv leave, read bool) (hash, stamp string, settled, ok 
 		}
 		rel, _ := filepath.Rel(dir, p)
 		rel = filepath.ToSlash(rel)
+		if p != dir && SkipInSkill(d.Name()) {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
 		if p != dir && lv >= leaveBuilt && fromInstall(d.Name(), d.IsDir() || d.Type()&fs.ModeSymlink != 0, lv == leaveInstalled) {
 			if d.IsDir() {
 				return filepath.SkipDir
@@ -260,9 +263,6 @@ func hashWalk(dir string, lv leave, read bool) (hash, stamp string, settled, ok 
 		}
 		switch {
 		case d.IsDir():
-			if d.Name() == ".git" && p != dir {
-				return filepath.SkipDir
-			}
 		case d.Type()&fs.ModeSymlink != 0:
 			fi, err := d.Info()
 			if err != nil {
@@ -273,7 +273,7 @@ func hashWalk(dir string, lv leave, read bool) (hash, stamp string, settled, ok 
 				t, _ := os.Readlink(p)
 				fmt.Fprintf(h, "link %s %s\n", rel, filepath.ToSlash(t))
 			}
-		case d.Type().IsRegular() && rel != marker && !(lv >= leaveFinder && d.Name() == ".DS_Store"):
+		case d.Type().IsRegular():
 			fi, err := d.Info()
 			if err != nil {
 				return err

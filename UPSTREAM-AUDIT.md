@@ -4,12 +4,40 @@ Snapshot: 2026-11-27. Upstream remains
 [`yetone/magpie`](https://github.com/yetone/magpie). The fork `main` is an
 exact mirror; `panel` contains maintenance documentation, the upstream-sync
 workflow, and verified local integrations. Upstream `main` is at
-`fd233eff`.
+`63f724e1`.
 
 ## Upstream Sync
 
-The 2026-11-27 panel sync includes every upstream commit through
-`fd233eff`. Its provider and gateway changes include:
+The final 2026-11-27 panel sync includes every upstream commit through
+`63f724e1`. Its provider, data, gateway, agent and GUI changes include:
+
+- `9cba5928`: Factory's mover minimum is 0.1.59 and Codex's identity
+  sentences follow the plugin update;
+- `918467f6`: a held folder on Windows stops a data move before anything is
+  copied and names the holder;
+- `9d6a11e5`: the site's live-token test checks the signature's changed first
+  character instead of its padding;
+- `f8866483`: a `call_id` over 64 characters stays bound to every upstream
+  that validates it;
+- `207b3775`: Copilot CLI's `/model` offers each Magpie model's reasoning
+  effort;
+- `7e4a92ba`: the tray panel opens under Umbriel's bar at its icon;
+- `2d57fb69`: a passed-over member explains why on its routing row, and one
+  account's members count as one seat for a new session;
+- `f834c203`: a group member's try that failed before billing has a request
+  row with its status and the vendor's words;
+- `bbeb0da9`: Settings › Appearance can increase contrast to match the
+  system;
+- `94451a2b`: a session turn shows what was said with its steps folded to one
+  line;
+- `bdde26a6`: a long session's sheet reads the remaining turns when asked;
+- `7c71990b`: a session fold draws its steps when first opened;
+- `cd6d110e`: a long session's sheet counts every turn in its file; and
+- `63f724e1`: the gateway search-queue test leaves the 40 ms quiet bar to
+  `silent` alone.
+
+The earlier 2026-11-27 panel sync through `fd233eff` retains these upstream
+provider and gateway changes:
 
 - `044e9bd2`: a key's model list never bars the vendor's own decision model
   (#7788);
@@ -64,6 +92,21 @@ It also retains upstream `eab4b006` and the five commits before it:
 The Reasonix integration from `#1033` and CatPaw discovery are both retained in
 the shared session listing and transcript switches.
 
+### Sync Verification
+
+The focused provider set (7 tests) and the tests in the gateway files changed
+by this sync (39 tests) pass on Windows under Go 1.26.8.
+`go vet -tags nogui ./...`, `gofmt`, and `git diff --check` also pass.
+The upstream config-folder test and the panel's #7749 claude-mem regression
+both pass after a folder's `.claude.json` was kept as a Claude Code marker.
+
+Two full-package boundaries were reproduced. The provider package's
+`TestRestartSwitchedCodexAppReal` emits no helper output and panics in its own
+slice indexing on this Windows host; the same test fails at the exact upstream
+commit `63f724e1`. The gateway package reaches a 25-minute suite timeout, while
+the refusal test active at the cutoff, together with all 39 tests above, passes
+in 27 seconds when run as the focused set. Neither is a merge-only regression.
+
 ## Integrated Open Issues
 
 | Issue | Current state | Verification |
@@ -96,7 +139,7 @@ the shared session listing and transcript switches.
 | [#7729](https://github.com/yetone/magpie/issues/7729) | Integrated in panel as `acd8dccf` | `serveWSL` leaves listeners to `http.Server.Shutdown` instead of closing them as its context ends, avoiding a false truncated-request error on Windows. Windows `WSL` tests, 10 race iterations and vet pass. |
 | [#7750](https://github.com/yetone/magpie/issues/7750) | Integrated in panel as `4b8b4d1a` | Obsidian config and vault probes are bounded to one second; a stalled path is treated as no Copilot and remembered once per process. Obsidian tests, the focused race test and vet pass. A real macOS File Provider stall remains unverified. |
 | [#7747](https://github.com/yetone/magpie/issues/7747) | Integrated in panel as `cb29c57f` | Each Claude run gets a unique ID and an optional `MAGPIE_CLAUDE_KILL` hook runs after the host tree ends, covering Docker/SSH/WSL exec boundaries. Abort waits for both cleanup paths. Focused gateway/TUI tests, race, native/Linux vet and Linux test compilation pass; no real Docker or WSL runtime was available. |
-| [#7749](https://github.com/yetone/magpie/issues/7749) | Integrated in panel as `a117be61` | A bare `~/.claude-* /settings.json` no longer makes a Claude Code profile unless it contains a key Claude Code or magpie writes. claude-mem is no longer listed or ticked, while credentials, projects and magpie's isolated Desktop Code tab still count. Focused tests and race pass. |
+| [#7749](https://github.com/yetone/magpie/issues/7749) | Integrated in panel as `a117be61` | A bare `~/.claude-* /settings.json` no longer makes a Claude Code profile unless it contains a key Claude Code or magpie writes. claude-mem is no longer listed or ticked, while a folder's own `.claude.json`, credentials, projects and magpie's isolated Desktop Code tab still count. Focused tests and race pass. |
 | [#7707](https://github.com/yetone/magpie/issues/7707) | Integrated in panel as `20539962` | Plain-text Anthropic cyber/content policy refusals from a 400, 502 or streamed `api_error` are classified as refusals, fail over to another provider/model and do not rest the account. Unrelated 400/502 messages keep their old behavior. Refusal-family tests, race and vet pass. |
 | [#7742](https://github.com/yetone/magpie/issues/7742) | Integrated in panel as `16871d9c` | A timed-out `magpie quota` now reports subscription cards that already landed, falls back to the last kept card for the rest, and labels a never-read signed-in subscription as "not read in time" instead of a fabricated balance configuration error. CLI/provider tests, race and vet pass. |
 | [#7755](https://github.com/yetone/magpie/issues/7755) | Integrated in panel as `88236698` | The artifact list/delete test now waits until the millisecond clock has moved past the previous artifact's timestamp before republishing it. The deterministic ID tie-break is retained, and the test passed 100 consecutive runs. The full artifact package still has an unrelated Windows file-mode assertion failure. |

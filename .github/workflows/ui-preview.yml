@@ -69,7 +69,11 @@ jobs:
 
   record:
     needs: detect
-    if: needs.detect.outputs.ui == 'true'
+    # Upstream only: the recorder signs its screenshots with the DEEPSEEK_API_KEY
+    # held by the `ui-preview` environment, which this fork does not configure.
+    # Running it here fails on `parameter null or not set` instead of previewing,
+    # so the fork skips the job rather than failing every pull request on it.
+    if: needs.detect.outputs.ui == 'true' && github.repository == 'yetone/magpie'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: ui-preview
@@ -126,7 +130,7 @@ jobs:
 
   publish:
     needs: [detect, record]
-    if: always() && needs.detect.outputs.ui == 'true'
+    if: always() && needs.detect.outputs.ui == 'true' && github.repository == 'yetone/magpie'
     runs-on: ubuntu-latest
     permissions:
       contents: write

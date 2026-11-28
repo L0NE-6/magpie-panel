@@ -5,7 +5,9 @@
 // imports this when Settings draws, so it weighs nothing on the core.
 window.guideBack = function () {
   const row = $("#guideBackRow");
-  if (!row || !state) return;
+  // state.agents is what anyMagpieModels reads, and a first render runs
+  // before /api/state has answered: the guard has to reach it (#8101)
+  if (!row || !state || !state.agents) return;
   const set = ((state.served || 0) > 0 || anyMagpieModels()) && state.agents.some((a) => a.wired);
   row.hidden = gatewayMode || !state.settings?.guideHidden || set;
   if (row.hidden || row.querySelector("button")) return;

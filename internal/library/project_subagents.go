@@ -219,9 +219,15 @@ func ProjectSubagents(dir string, names, agents []string) (*Result, error) {
 		if len(names) == 0 {
 			return errors.New("no subagents given")
 		}
-		for _, n := range names {
-			if l.subagent(n) == nil {
-				return fmt.Errorf("no subagent called %s", n)
+		// Taking an assignment out asks nothing of the library: a project can
+		// hold a key for a subagent that was renamed or removed since, and
+		// removing that key is the only way to clear it (#8051). Giving one
+		// to an agent still needs the subagent to exist.
+		if len(agents) > 0 {
+			for _, n := range names {
+				if l.subagent(n) == nil {
+					return fmt.Errorf("no subagent called %s", n)
+				}
 			}
 		}
 		var ids []string

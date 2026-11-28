@@ -186,3 +186,22 @@ func TestProjectSubagentsFollowWorktrees(t *testing.T) {
 		t.Error("the worktree keeps a subagent the project no longer has")
 	}
 }
+
+// A project's assignment can outlive the subagent it names (#8051): a rename
+// or a removal leaves the key behind, the Library page does not show it, and
+// an apply is additive. Taking that key out must not ask the library for the
+// subagent back, or nothing can clear it but hand-editing library.json.
+func TestProjectSubagentsClearAKeyTheLibraryNoLongerHas(t *testing.T) {
+	_, a, _ := subagentProjects(t)
+	ok(t)(ProjectSubagents(a, []string{"reviewer"}, []string{"claude"}))
+	ok(t)(RemoveSubagents([]string{"reviewer"}))
+
+	// the key is still on the project and the library has no "reviewer":
+	// before this, every route answered "no subagent called reviewer"
+	ok(t)(ProjectSubagents(a, []string{"reviewer"}, nil))
+
+	// and giving it to an agent still needs the subagent to exist
+	if _, err := ProjectSubagents(a, []string{"reviewer"}, []string{"claude"}); err == nil {
+		t.Error("a subagent the library does not have was given to an agent")
+	}
+}

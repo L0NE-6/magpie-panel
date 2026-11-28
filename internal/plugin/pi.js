@@ -102,12 +102,56 @@ function keepSig(id, sig) {
 
 const zeroUsage = () => ({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } })
 
+// imageURLAllowed is where an image block's url may point (#8047): http and
+// https only, and not at a host inside this machine or its network. Bun's
+// fetch reads file: and speaks to whatever the url names, so without this an
+// agent's own conversation could read a local file or reach a metadata
+// service. A private name is refused as well: link-local, loopback,
+// unspecified, a .local or .internal name, and the RFC 1918 ranges.
+export function imageURLAllowed(raw) {
+  let u
+  try {
+    u = new URL(String(raw))
+  } catch {
+    return false
+  }
+  if (u.protocol !== "http:" && u.protocol !== "https:") return false
+  const host = u.hostname.replace(/^\[|\]$/g, "").toLowerCase()
+  if (!host) return false
+  if (host === "localhost" || host.endsWith(".localhost")) return false
+  if (host.endsWith(".local") || host.endsWith(".internal") || host.endsWith(".home.arpa")) return false
+  // a bare name is this network's as likely as not: an image is not worth it
+  if (!host.includes(".") && !host.includes(":")) return false
+  const v4 = /(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/.exec(host)
+  if (v4) {
+    const [a, b] = [Number(v4[1]), Number(v4[2])]
+    if (v4.slice(1).some((n) => Number(n) > 255)) return false
+    if (a === 0 || a === 10 || a === 127) return false
+    if (a === 169 && b === 254) return false // link-local, cloud metadata
+    if (a === 172 && b >= 16 && b <= 31) return false
+    if (a === 192 && b === 168) return false
+    if (a === 100 && b >= 64 && b <= 127) return false // CGNAT
+    if (a >= 224) return false // multicast, reserved
+    return true
+  }
+  if (host.includes(":")) {
+    // IPv6: loopback, unspecified, unique-local (fc00::/7), link-local (fe80::/10)
+    if (host === "::1" || host === "::") return false
+    if (/^f[cd]/.test(host)) return false
+    if (/^fe[89ab]/.test(host)) return false
+    if (host.startsWith("::ffff:")) return imageURLAllowed("http://" + host.slice(7) + "/")
+    return true
+  }
+  return true
+}
+
 async function imageOf(b) {
   const s = b.source ?? {}
   if (s.type === "base64") return { type: "image", data: s.data, mimeType: s.media_type ?? "image/png" }
   if (s.type === "url" && typeof s.url === "string") {
     const m = /^data:([^;,]+);base64,(.*)$/s.exec(s.url)
     if (m) return { type: "image", data: m[2], mimeType: m[1] }
+    if (!imageURLAllowed(s.url)) throw new Error(`the image url ${s.url} is not one magpie fetches`)
     const r = await fetch(s.url)
     if (!r.ok) throw new Error(`couldn't fetch the image ${s.url}: ${r.status}`)
     return { type: "image", data: Buffer.from(await r.arrayBuffer()).toString("base64"), mimeType: r.headers.get("content-type")?.split(";")[0] || "image/png" }

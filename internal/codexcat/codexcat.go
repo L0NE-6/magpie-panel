@@ -1257,12 +1257,29 @@ func shownName(m catalog.Model) string {
 // entry, its description ending " via magpie" so it is told from Codex's
 // own (catalog.MagpieAdded). False when m has none, or one magpie can't
 // read, which is then made as any other model's.
+// searchToolUnlessSaid is an entry that carries the vendor's own, which most
+// often says nothing: Codex's code-mode tool search is the client's, not the
+// upstream's, so an entry silent on it gets it. One that answers false keeps
+// its answer (#7904).
+func searchToolUnlessSaid(e map[string]any) {
+	if _, said := e["supports_search_tool"]; !said {
+		e["supports_search_tool"] = true
+	}
+}
+
 func listedEntry(m catalog.Model, priority int, work settings.Settings, autoReview string, v1 bool, effort string) (map[string]any, bool) {
 	var raw map[string]any
 	if len(m.Codex) == 0 || json.Unmarshal(m.Codex, &raw) != nil || raw == nil {
 		return nil, false
 	}
 	e := ownEntry(raw, m.ID, shownName(m), priority)
+	// Codex's code-mode tool search is the client's, not the upstream's: an
+	// entry that carries tool_mode code_mode_only without this leaves Codex
+	// sending every tool description whole, 164K tokens before the first word
+	// (#7904: 181,790 in, against 25,451 with this on). The entries magpie
+	// builds itself say true (the model literal below); this one carries the
+	// vendor's, which most often says nothing at all.
+	searchToolUnlessSaid(e)
 	desc, _ := e["description"].(string)
 	// another magpie's entry ends so already: said once
 	e["description"] = cmp.Or(strings.TrimSuffix(strings.TrimSpace(desc), " via magpie"), m.Name) + " via magpie"

@@ -149,6 +149,9 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         // All again: the page stays where it is
         await press(".pm-kinds .opt[data-seg='']");
         await page.waitForFunction((top) => Math.abs(document.querySelector("#view-plugins").scrollTop - top) <= 2, end.top);
+        // the bar glides, so it lands after the scroll does: wait for it, bounded,
+        // before asking where it ended (#8102)
+        for (let i = 0; i < 40 && Math.abs((await at()).bar) > 2; i++) await page.waitForTimeout(50);
         assert.ok(Math.abs((await at()).bar) <= 2, "All leaves the bar where it was");
         // and the reader can scroll back up to the picks
         await view.hover();

@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -28,6 +29,19 @@ const ThisComputer = "this"
 
 // SharedDays is how many days of calls a computer keeps on the server.
 const SharedDays = 90
+
+// SharedDayLimit is how many days of calls shareWith keeps on the server:
+// SharedDays unless MAGPIE_SHARED_USAGE_DAYS says otherwise, where 0 keeps
+// every day and nothing is pruned (#8034). A value that is not a number, or
+// is negative, leaves the default in place rather than guessing.
+func SharedDayLimit() int {
+	if v := strings.TrimSpace(os.Getenv("MAGPIE_SHARED_USAGE_DAYS")); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			return n
+		}
+	}
+	return SharedDays
+}
 
 // SharedDay is one computer's calls of one day, as it puts them on the server.
 type SharedDay struct {

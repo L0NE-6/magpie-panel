@@ -104,8 +104,14 @@ func shareWith(ctx context.Context, c Config, u *usageState, fs files) error {
 	id, name := usage.Computer()
 	now := usage.Clock()
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
-	first := today.AddDate(0, 0, 1-usage.SharedDays)
-	from := first.Format(time.DateOnly)
+	// SharedDayLimit days back is where the server's copy starts; 0 keeps
+	// every day, so nothing is skipped and nothing is pruned (#8034).
+	limit := usage.SharedDayLimit()
+	first := today.AddDate(0, 0, 1-limit)
+	from := ""
+	if limit > 0 {
+		from = first.Format(time.DateOnly)
+	}
 	since := first
 	if u.Whole {
 		since = today.AddDate(0, 0, -1)
@@ -117,7 +123,7 @@ func shareWith(ctx context.Context, c Config, u *usageState, fs files) error {
 		u.Got = map[string]string{}
 	}
 	for day, calls := range usage.OwnDays(since) {
-		if day < from {
+		if from != "" && day < from {
 			continue
 		}
 		plain, err := json.Marshal(usage.SharedDay{Computer: id, Name: name, Day: day, Calls: calls})

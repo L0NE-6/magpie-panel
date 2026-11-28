@@ -6446,19 +6446,20 @@ func (s *Server) attempt(w http.ResponseWriter, r *http.Request, from provider.P
 	// (custom_tool.go, #2656): translated on the client's own API, which
 	// offers them as functions
 	customOff := func() bool {
-		if from != provider.Responses || !hasCustomTool(body) {
+		if from != provider.Responses {
 			return false
 		}
-		// Grok's, on Copilot's /responses in front of it: xAI takes no
-		// custom tool (#3392), and Copilot's answer says no more than the
-		// status — "422 Unprocessable Entity: Unprocessable Entity"
-		// (#2951, #4374: six requests of one turn, all refused) — so
-		// nothing tells magpie what to learn from. They go as functions
-		// from the first ask.
-		if p.Account != nil && p.Account.Agent == "copilot" && grokModel(model) {
-			return true
+		// The recorded refusal is read first: hasCustomTool decodes the whole
+		// body into map[string]any, and a provider that never refused a custom
+		// tool answers here without that decode whatever the body holds
+		// (#8033).
+		if s.fits(p.ID, customToolRefused(model), from) {
+			if p.Account != nil && p.Account.Agent == "copilot" && grokModel(model) {
+				return hasCustomTool(body)
+			}
+			return false
 		}
-		return !s.fits(p.ID, customToolRefused(model), from)
+		return hasCustomTool(body)
 	}
 	if relay && !keep && customOff() {
 		relay, ownAPI = false, true

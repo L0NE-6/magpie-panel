@@ -40,6 +40,21 @@ import (
 // and 2500 patches of 32 px; "original" 6000 px and 10000 patches. Codex
 // refuses "low" itself, and it is left as sent. WebP, which Go's standard
 // library doesn't decode, is left as sent too.
+// rawAt says whether b at holds s, compared where it sits: string(b[at:]) would
+// copy the whole data URL of every image, which on a turn of 35 screenshots is
+// most of the body (#8033).
+func rawAt(b []byte, s string, at int) bool {
+	if at < 0 || at+len(s) > len(b) {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		if b[at+i] != s[i] {
+			return false
+		}
+	}
+	return true
+}
+
 func codexImagesFit(p provider.Provider, to provider.Protocol, body []byte) []byte {
 	if p.Account == nil || p.Account.Agent != "codex" || to != provider.Responses || !bodyHas(body, `input_image`) {
 		return body
@@ -77,7 +92,7 @@ func codexImagesFit(p provider.Provider, to provider.Protocol, body []byte) []by
 					return true
 				}
 				end := url.Index + len(url.Raw)
-				if url.Type != gjson.String || url.Index <= 0 || end > len(body) || string(body[url.Index:end]) != url.Raw || !strings.HasPrefix(url.Str, "data:") {
+				if url.Type != gjson.String || url.Index <= 0 || end > len(body) || !rawAt(body, url.Raw, url.Index) || !strings.HasPrefix(url.Str, "data:") {
 					return true
 				}
 				if limits, ok := codexImageLimits(detail.String()); ok {

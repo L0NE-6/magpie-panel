@@ -362,7 +362,11 @@ func (s *Server) codexDescription(w http.ResponseWriter, r *http.Request, body [
 		s.sentNowhere(w, r, body, "Descriptions off", "Codex descriptions are off in Codex's settings on magpie's Agents page: answered with no description, sent nowhere", nil)
 		return
 	}
-	s.codexShaped(w, r, body, to, "description", true, descriptionJSON, noDescription)
+	// The model is the caller's unless codexDescriptionsTo found a session
+	// that named it, so this asks for the key's own allowance like its
+	// siblings do: magpieChose here let a restricted key spend any model
+	// the request body named (#8012).
+	s.codexShaped(w, r, body, to, "description", false, descriptionJSON, noDescription)
 }
 
 // codexSummary answers a thread_summary request as codexSummariesTo says,

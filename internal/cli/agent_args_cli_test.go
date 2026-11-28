@@ -189,6 +189,12 @@ func TestAgentFieldNameShowsIt(t *testing.T) {
 // sonnet, haiku and fable name its model as well as its tiers, and stay
 // the model's (TestClaudeTierNamesSetTheModel).
 func TestEveryAgentFieldNameWritesNothing(t *testing.T) {
+	// gsettings is the system proxy's own reader (netproxy/system_linux.go),
+	// and on Linux it writes dconf/user and glib-2.0/settings under the config
+	// home the first time it runs - a write of gsettings', not magpie's, which
+	// this test counts (#8092). The memory backend reads no settings at all,
+	// which is what an empty config home has anyway.
+	t.Setenv("GSETTINGS_BACKEND", "memory")
 	cliHome(t)
 	writeHomeFile(t, filepath.Join(".claude", "settings.json"), "{\n  \"model\": \"opus\",\n  \"theme\": \"dark\"\n}\n")
 	if _, err := printed(t, func() error { return run([]string{"groups"}) }); err != nil {

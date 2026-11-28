@@ -66,10 +66,34 @@ func inFolder(cwd, run string) string {
 	return "cd " + argQuote(cwd) + " && " + run
 }
 
+// powerShellQuote is s as one single-quoted PowerShell argument: wrapped in
+// '...', with every quote character in it doubled. ASCII ' is not the only
+// one PowerShell's parser takes as a single quote: U+2018, U+2019, U+201A and
+// U+201B are too (#8048), so a cwd or argument holding one - a cloned
+// third-party repository's name, say - would end the quoted string there and
+// have what follows read as code. Each of them is escaped by doubling that
+// same character, as ' is.
+func powerShellQuote(s string) string {
+	var b strings.Builder
+	b.Grow(len(s) + 2)
+	b.WriteByte('\'')
+	for _, r := range s {
+		switch r {
+		case '\'', '\u2018', '\u2019', '\u201a', '\u201b':
+			b.WriteRune(r) // the pair
+			b.WriteRune(r)
+		default:
+			b.WriteRune(r)
+		}
+	}
+	b.WriteByte('\'')
+	return b.String()
+}
+
 // argQuote is s as one argument of this system's shell.
 func argQuote(s string) string {
 	if runtime.GOOS == "windows" {
-		return "'" + strings.ReplaceAll(s, "'", "''") + "'"
+		return powerShellQuote(s)
 	}
 	return shellQuote(s)
 }

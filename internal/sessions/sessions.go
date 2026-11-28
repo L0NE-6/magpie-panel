@@ -3155,7 +3155,7 @@ func resumeCommand(distro, agent, id, cwd, path string) string {
 		return run
 	}
 	if runtime.GOOS == "windows" {
-		return "Set-Location -LiteralPath '" + strings.ReplaceAll(cwd, "'", "''") + "'; " + run
+		return "Set-Location -LiteralPath " + powerShellQuote(cwd) + "; " + run
 	}
 	return "cd " + shellQuote(cwd) + " && " + run
 }

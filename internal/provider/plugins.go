@@ -706,6 +706,13 @@ func (p Provider) pluginAPIs(model string) []Protocol {
 		if own := pluginProtocol(pp.ID, plugin.Model{ID: model, NPM: pp.NPM}); own != Chat && p.Base(own) != "" {
 			return []Protocol{own}
 		}
+		// The provider's own API is chat completions: an unlisted model is
+		// spoken to on that, and only that, so a Messages client's request is
+		// translated rather than relayed as Messages to a plugin that serves
+		// its Messages endpoint only its own models on (WorkBuddy answers 400
+		// for a chat model there, #8025). A chat client is unaffected: chat
+		// was what it took under "any API" too.
+		return []Protocol{Chat}
 	}
 	return nil
 }

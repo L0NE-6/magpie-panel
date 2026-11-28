@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/tidwall/gjson"
+
+	"github.com/yetone/magpie/internal/catalog"
 	"github.com/tidwall/jsonc"
 	"github.com/yetone/magpie/internal/edit"
 	"github.com/yetone/magpie/internal/provider"
@@ -590,5 +592,47 @@ func TestVSCodeKeepsThePickedEffort(t *testing.T) {
 	kept("a sync after a model went")
 	if g, _ := edit.GetJSONItem(lm, vscodeGroup); gjson.Get(g, "models.#").Int() != 1 {
 		t.Fatalf("a gone model stayed: %s", g)
+	}
+}
+
+// A model that supports a reasoning effort says it thinks in the file VS Code
+// reads (#8045): without "thinking", VS Code's OpenAIEndpoint writes only a
+// turn's cot_summary and never reasoning_content, so an upstream that wants
+// the chain back on every tool-bearing turn never receives it.
+func TestVSCodeSaysWhichModelsThink(t *testing.T) {
+	home := syncHome(t)
+	dir := filepath.Join(home, "vscode", "User")
+	// the fixture's own model, told it supports an effort: the one thing this
+	// test needs that the shared catalog does not carry
+	if err := catalog.SaveLive("relay", "https://relay.test/v1", []catalog.Model{{
+		ID: "glm-4.6", Name: "GLM 4.6", Context: 128000, Output: 8192,
+		Efforts: []string{"low", "medium", "high"},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	a := vscodeAt(dir)
+	if err := a.Connect(); err != nil {
+		t.Fatal(err)
+	}
+	var groups []struct {
+		Models []map[string]any `json:"models"`
+	}
+	if err := json.Unmarshal([]byte(readFile(filepath.Join(dir, "chatLanguageModels.json"))), &groups); err != nil {
+		t.Fatal(err)
+	}
+	seen := 0
+	for _, g := range groups {
+		for _, m := range g.Models {
+			if m["id"] != "relay/glm-4.6" {
+				continue
+			}
+			seen++
+			if m["thinking"] != true {
+				t.Errorf("relay/glm-4.6 supports %v and says nothing of thinking: %v", m["supportsReasoningEffort"], m)
+			}
+		}
+	}
+	if seen == 0 {
+		t.Fatalf("the group VS Code reads has no relay/glm-4.6, so this says nothing")
 	}
 }

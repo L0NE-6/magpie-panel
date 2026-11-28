@@ -650,6 +650,12 @@ func vscodeGroupJSON(k vscodeKind, vendor string) map[string]any {
 		if len(m.Efforts) > 0 {
 			entry["supportsReasoningEffort"] = m.Efforts
 			entry["reasoningEffortFormat"] = "chat-completions"
+			// A model that thinks says so here (#8045): without it VS Code's
+			// OpenAIEndpoint writes only the summary of a turn's thinking
+			// (cot_summary) and never reasoning_content, so an upstream that
+			// wants the chain back on every tool-bearing turn (DeepSeek's
+			// thinking mode) never gets it.
+			entry["thinking"] = true
 		}
 		list = append(list, entry)
 	}

@@ -103,7 +103,8 @@ func sourceDigestsLoad() {
 // encoded are let go of. Kept as encoded when the file isn't b (another
 // write since) or can't be mapped. Under sourceDigests' lock.
 func keepMapped(p string, b []byte) {
-	if sourceDigestsDisk.path != p || len(sourceDigestsDisk.kept) == 0 || &sourceDigestsDisk.kept[0] != &b[len(b)-len(sourceDigestsDisk.kept)] {
+	if sourceDigestsDisk.path != p || len(sourceDigestsDisk.kept) == 0 || len(sourceDigestsDisk.kept) > len(b) ||
+		&sourceDigestsDisk.kept[0] != &b[len(b)-len(sourceDigestsDisk.kept)] {
 		return // kept is no longer what b holds
 	}
 	m, ok := mapDiskFile(p)

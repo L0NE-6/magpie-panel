@@ -157,13 +157,14 @@ func (s *Server) keepsCompaction(from provider.Protocol, p provider.Provider, mo
 	if compactionTriggerIn(body) {
 		return true
 	}
-	if len(sealedCompactions(body)) == 0 {
+	encs := sealedCompactions(body)
+	if len(encs) == 0 {
 		return false
 	}
 	if p.CompactsOn(model) {
 		return true
 	}
-	cp, ok := checkpointOf(body)
+	cp, ok := checkpointOfSealed(encs)
 	return ok && cp.Provider == p.ID
 }
 
@@ -286,7 +287,12 @@ func checkpointFor(enc string) (checkpointWriter, bool) {
 // checkpointOf is who sealed the latest compaction in a Responses
 // request's input that magpie knows the writer of.
 func checkpointOf(body []byte) (checkpointWriter, bool) {
-	encs := sealedCompactions(body)
+	return checkpointOfSealed(sealedCompactions(body))
+}
+
+// checkpointOfSealed is checkpointOf for encs a caller has already read from
+// the body, so keepsCompaction does not walk input's array twice (#8033).
+func checkpointOfSealed(encs []string) (checkpointWriter, bool) {
 	if len(encs) == 0 {
 		return checkpointWriter{}, false
 	}

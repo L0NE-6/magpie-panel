@@ -703,7 +703,12 @@ func (p Provider) pluginAPIs(model string) []Protocol {
 		return pluginProtocols(pp.ID, m)
 	}
 	if pp.NPM != "" {
-		if own := pluginProtocol(pp.ID, plugin.Model{ID: model, NPM: pp.NPM}); own != Chat && p.Base(own) != "" {
+		// The plugin reads one API, and that is the one an unlisted model is
+		// spoken to on - whether or not a base for it is written beside the
+		// provider: a chat client's body relayed to an Anthropic-only plugin
+		// is what it refuses ("image_url is not supported", "a tool without a
+		// valid name", #7908). chat completions is the other case below.
+		if own := pluginProtocol(pp.ID, plugin.Model{ID: model, NPM: pp.NPM}); own != Chat {
 			return []Protocol{own}
 		}
 		// The provider's own API is chat completions: an unlisted model is

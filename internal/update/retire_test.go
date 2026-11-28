@@ -125,6 +125,18 @@ func TestRetiredKeptWhileRunFrom(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Start returns before lsof has a process to name, and on a slow or
+	// sandboxed box that window is wide enough to read as "nothing runs
+	// from it" (#8046). Wait until the helper is seen running the app, so
+	// what this test says is about RemoveRetired and not about the clock.
+	deadline := time.Now().Add(10 * time.Second)
+	for !runFrom(bundle) {
+		if time.Now().After(deadline) {
+			t.Fatalf("the helper was never seen running %s: nothing can be said about what RemoveRetired keeps", bundle)
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+
 	RemoveRetired(bundle)
 	if kept, _ := os.ReadDir(retiredDir(bundle)); len(kept) != 1 {
 		t.Fatalf("the app a running magpie runs from was removed (%d kept)", len(kept))

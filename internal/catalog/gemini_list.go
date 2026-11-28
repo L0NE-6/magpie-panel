@@ -20,6 +20,10 @@ import (
 // list also has embedding models (embedContent), Imagen's (predict) and
 // Veo's (predictLongRunning), which no agent can talk to (#1346). It
 // answers the URL it asked first.
+// geminiPages caps how many pages of one Gemini model list are followed:
+// past it the list is partial, and a partial list is not returned as one.
+const geminiPages = 20
+
 func FetchGemini(ctx context.Context, base, key string, headers map[string]string) ([]Model, string, error) {
 	base = strings.TrimRight(strings.TrimSpace(base), "/")
 	if base == "" {
@@ -28,7 +32,12 @@ func FetchGemini(ctx context.Context, base, key string, headers map[string]strin
 	at := base + "/models"
 	var out []Model
 	token := ""
-	for range 20 {
+	// Twenty pages or a token that comes back unchanged is still a partial
+	// list: half a list is not a list, and a caller that took it as one would
+	// drop every model past the cap from a provider's picks (#8030, as
+	// catalog.Paged says for the other vendors).
+	for range geminiPages {
+		sent := token
 		u := at + "?pageSize=1000"
 		if token != "" {
 			u += "&pageToken=" + url.QueryEscape(token)
@@ -38,9 +47,16 @@ func FetchGemini(ctx context.Context, base, key string, headers map[string]strin
 			return nil, at, err
 		}
 		out = append(out, page...)
-		if token = next; token == "" {
+		token = next
+		if token == "" {
 			break
 		}
+		if token == sent {
+			return nil, at, fmt.Errorf("%s: the model list asks again with the page token it was given (%q), so it never ends", at, token)
+		}
+	}
+	if token != "" {
+		return nil, at, fmt.Errorf("%s: still paging after %d pages of the model list", at, geminiPages)
 	}
 	if len(out) == 0 {
 		return nil, at, errors.New(at + ": no models listed")

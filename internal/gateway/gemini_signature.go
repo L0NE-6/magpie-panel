@@ -166,22 +166,83 @@ func unsignCalls(r *Request) {
 }
 
 // googleSignature is the thought signature in a tool call's extra_content.
+// Only the wire-protocol lowercase keys google.thought_signature are read,
+// matching withoutGoogleSignature and withGoogleSignature.
 func googleSignature(extra json.RawMessage) string {
 	if len(extra) == 0 {
 		return ""
 	}
-	var v struct {
-		Google struct {
-			ThoughtSignature string `json:"thought_signature"`
-		} `json:"google"`
+	var top map[string]json.RawMessage
+	if decodeJSON(extra, &top) != nil || top == nil {
+		return ""
 	}
-	json.Unmarshal(extra, &v)
-	return v.Google.ThoughtSignature
+	var g map[string]json.RawMessage
+	if decodeJSON(top["google"], &g) != nil || g == nil {
+		return ""
+	}
+	var sig string
+	if json.Unmarshal(g["thought_signature"], &sig) != nil {
+		return ""
+	}
+	return sig
 }
 
 // googleExtra is extra_content carrying a thought signature.
 func googleExtra(sig string) map[string]any {
 	return map[string]any{"google": map[string]any{"thought_signature": sig}}
+}
+
+// withoutGoogleSignature removes only google.thought_signature from an
+// extra_content object, dropping empty google and extra_content containers
+// while preserving any sibling fields.
+func withoutGoogleSignature(extra json.RawMessage) (json.RawMessage, bool) {
+	var top map[string]json.RawMessage
+	if decodeJSON(extra, &top) != nil || top == nil {
+		return extra, false
+	}
+	var g map[string]json.RawMessage
+	if decodeJSON(top["google"], &g) != nil || g == nil {
+		return extra, false
+	}
+	if _, ok := g["thought_signature"]; !ok {
+		return extra, false
+	}
+	delete(g, "thought_signature")
+	if len(g) == 0 {
+		delete(top, "google")
+	} else {
+		top["google"], _ = marshalPlain(g)
+	}
+	if len(top) == 0 {
+		return nil, true
+	}
+	out, err := marshalPlain(top)
+	if err != nil {
+		return extra, false
+	}
+	return out, true
+}
+
+// withGoogleSignature sets google.thought_signature on extra_content while
+// preserving any sibling fields already present.
+func withGoogleSignature(extra json.RawMessage, sig string) json.RawMessage {
+	var top map[string]json.RawMessage
+	if decodeJSON(extra, &top) != nil || top == nil {
+		b, _ := marshalPlain(googleExtra(sig))
+		return b
+	}
+	var g map[string]json.RawMessage
+	if decodeJSON(top["google"], &g) != nil || g == nil {
+		g = map[string]json.RawMessage{}
+	}
+	g["thought_signature"], _ = marshalPlain(sig)
+	top["google"], _ = marshalPlain(g)
+	out, err := marshalPlain(top)
+	if err != nil {
+		b, _ := marshalPlain(googleExtra(sig))
+		return b
+	}
+	return out
 }
 
 // chatCallSignatures is a Chat request relayed as it is to provider by
@@ -192,7 +253,7 @@ func googleExtra(sig string) map[string]any {
 // A signature another provider gave (foreignSignature) goes to none, nor
 // does any when keep is false (signatureRefused: asked again without).
 func chatCallSignatures(body []byte, gemini bool, by string, keep bool) []byte {
-	signed := bodyHas(body, sigMark)
+	signed := bodyHas(body, sigMark) || bodyHasBytes(body, thoughtSignatureField)
 	if !signed && !(gemini && bodyHas(body, `"tool_calls"`)) {
 		return body
 	}
@@ -229,8 +290,14 @@ func chatCallSignatures(body []byte, gemini bool, by string, keep bool) []byte {
 				// as one this provider didn't sign
 				sig = ""
 				if googleSignature(c["extra_content"]) != "" {
-					delete(c, "extra_content")
-					changed = true
+					if rest, ok := withoutGoogleSignature(c["extra_content"]); ok {
+						if len(rest) == 0 {
+							delete(c, "extra_content")
+						} else {
+							c["extra_content"] = rest
+						}
+						changed = true
+					}
 				}
 			}
 			sigs[i] = sig
@@ -245,7 +312,7 @@ func chatCallSignatures(body []byte, gemini bool, by string, keep bool) []byte {
 				if sig == "" || googleSignature(c["extra_content"]) == sig || signerOf(sig) != by {
 					continue
 				}
-				c["extra_content"], _ = marshalPlain(googleExtra(sig))
+				c["extra_content"] = withGoogleSignature(c["extra_content"], sig)
 				changed = true
 			}
 		} else {
@@ -260,7 +327,7 @@ func chatCallSignatures(body []byte, gemini bool, by string, keep bool) []byte {
 				if googleSignature(c["extra_content"]) == sig {
 					continue
 				}
-				c["extra_content"], _ = marshalPlain(googleExtra(sig))
+				c["extra_content"] = withGoogleSignature(c["extra_content"], sig)
 				changed = true
 			}
 		}

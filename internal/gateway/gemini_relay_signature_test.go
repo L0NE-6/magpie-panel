@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/tidwall/gjson"
 	"github.com/yetone/magpie/internal/provider"
 )
 
@@ -96,6 +97,79 @@ func TestRelayGeminiSignatureGoesBack(t *testing.T) {
 				t.Fatalf("the relay was sent the call %v and the result for %v", call, result["tool_call_id"])
 			}
 		})
+	}
+}
+
+// A Chat client can keep the signature in extra_content with a plain call id.
+func TestChatRelayWithExplicitSignature(t *testing.T) {
+	const sig = "c2lnbmVkLWNhbGw="
+	const body = `{"model":"fake/m1","messages":[{"role":"assistant","tool_calls":[{"id":"call_a","type":"function","function":{"name":"read","arguments":"{}"},"extra_content":{"google":{"thought_signature":"` + sig + `","other":1},"vendor_x":true}}]},{"role":"tool","tool_call_id":"call_a","content":"ok"}]}`
+	for _, tc := range []struct {
+		name, signer string
+		wantCalls    int
+	}{{"foreign", "other", 1}, {"unknown", "", 2}, {"own", "fake", 2}} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := &fake{ctype: "application/json", reply: chatOK}
+			setup(t, provider.Chat, f)
+			if tc.signer != "" {
+				noteSigner(sig, tc.signer)
+			}
+			f.refuse = func(b []byte) (int, string) {
+				msgs := gjson.GetBytes(b, "messages")
+				call := msgs.Get("0.tool_calls.0")
+				if call.Get("id").String() != "call_a" || call.Get("function.name").String() != "read" || msgs.Get("1.tool_call_id").String() != "call_a" {
+					t.Errorf("relay received unpaired call: %s", msgs)
+				}
+				extra := call.Get("extra_content")
+				if extra.Get("google.other").Int() != 1 || !extra.Get("vendor_x").Bool() {
+					t.Errorf("relay lost sibling extra_content fields: %s", extra)
+				}
+				if gotSig := extra.Get("google.thought_signature"); gotSig.Exists() {
+					if tc.signer == "other" || gotSig.String() != sig {
+						t.Errorf("relay received unexpected thought_signature: %s", extra)
+					}
+					return http.StatusBadRequest, studioCorrupted
+				}
+				return 0, ""
+			}
+			code, reply := post(t, "/v1/chat/completions", body)
+			if code != http.StatusOK || !strings.Contains(reply, "hello") || f.calls != tc.wantCalls {
+				t.Errorf("got HTTP %d after %d relay calls, want HTTP 200 after %d: %s", code, f.calls, tc.wantCalls, reply)
+			}
+		})
+	}
+}
+
+func TestChatRelayWithoutSignaturesKeepsBody(t *testing.T) {
+	for _, tc := range []struct{ name, body string }{
+		{"plain", `{"messages": [ {"role":"assistant", "tool_calls":[{"id":"call_a", "type":"function", "function":{"name":"read", "arguments":"{}"}}]}, {"role":"tool", "tool_call_id":"call_a", "content":"ok"}]}`},
+		{"field name in text only", `{"messages": [ {"role":"user", "content":"thought_signature"}, {"role":"assistant", "tool_calls":[{"id":"call_a", "type":"function", "function":{"name":"read", "arguments":"{}"}}]}, {"role":"tool", "tool_call_id":"call_a", "content":"ok"}]}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := string(chatCallSignatures([]byte(tc.body), false, "relay", true)); got != tc.body {
+				t.Errorf("unsigned body changed to %s", got)
+			}
+		})
+	}
+	// When extra_content holds only google.thought_signature, stripping drops
+	// the empty container cleanly too.
+	fresh(t)
+	noteSigner("c2lnLW9ubHk=", "other")
+	only := `{"messages":[{"role":"assistant","tool_calls":[{"id":"call_a","type":"function","function":{"name":"read","arguments":"{}"},"extra_content":{"google":{"thought_signature":"c2lnLW9ubHk="}}}]}]}`
+	if out := string(chatCallSignatures([]byte(only), false, "relay", true)); strings.Contains(out, "extra_content") {
+		t.Errorf("empty extra_content container kept: %s", out)
+	}
+	// Gemini-compatible write-back and signed-ID write-back both preserve
+	// sibling extra_content fields while only touching google.thought_signature.
+	noteSigner("c2lnLW93bg==", "relay")
+	ownID := signedID("call_a", "c2lnLW93bg==")
+	withSibling := `{"messages":[{"role":"assistant","tool_calls":[{"id":"` + ownID + `","type":"function","function":{"name":"read","arguments":"{}"},"extra_content":{"google":{"other":1},"vendor_x":true}}]}]}`
+	for _, gemini := range []bool{false, true} {
+		out := chatCallSignatures([]byte(withSibling), gemini, "relay", true)
+		ec := gjson.GetBytes(out, "messages.0.tool_calls.0.extra_content")
+		if ec.Get("google.thought_signature").String() != "c2lnLW93bg==" || ec.Get("google.other").Int() != 1 || !ec.Get("vendor_x").Bool() {
+			t.Errorf("gemini=%v write-back lost sibling fields: %s", gemini, out)
+		}
 	}
 }
 

@@ -1124,7 +1124,6 @@ func (s *Server) videosCreate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, provider.Chat, code, msg)
 		s.record(call)
 	}
-	named := f.Model != "" // a gateway key's models hold one the caller names (#882)
 	if f.Model == "" {
 		m, ok := videomaker()
 		if !ok {
@@ -1158,7 +1157,9 @@ func (s *Server) videosCreate(w http.ResponseWriter, r *http.Request) {
 		r = heldByGroup(r, g) // held to the group's accounts, if it is
 	}
 	keyWho, keyHeld := keyHolds(r)
-	if named && (isGroup && !groupGiven(r, keyWho, keyHeld, g, ms) || keyHeld && !isGroup && !modelAllowed(keyWho, p, model)) {
+	// As for an image: the model may be the caller's or magpie's own pick,
+	// and a key held to some models may use neither it was not given (#8012).
+	if isGroup && !groupGiven(r, keyWho, keyHeld, g, ms) || keyHeld && !isGroup && !modelAllowed(keyWho, p, model) {
 		fail(keyModelRefusal(w, keyWho, f.Model))
 		return
 	}

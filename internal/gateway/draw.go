@@ -741,7 +741,6 @@ func (s *Server) images(edit bool) http.HandlerFunc {
 			writeError(w, provider.Chat, code, msg)
 			s.record(call)
 		}
-		named := d.Model != "" // a gateway key's models hold one the caller names (#882)
 		if d.Model == "" {
 			m, ok := drawer()
 			if !ok {
@@ -772,7 +771,11 @@ func (s *Server) images(edit bool) http.HandlerFunc {
 			r = heldByGroup(r, g) // held to the group's accounts, if it is
 		}
 		keyWho, keyHeld := keyHolds(r)
-		if named && (isGroup && !groupGiven(r, keyWho, keyHeld, g, ms) || keyHeld && !isGroup && !modelAllowed(keyWho, p, model)) {
+		// The model is the caller's or, when it named none, the one magpie's
+		// Settings picked - and a key held to some models may use neither
+		// one it was not given (#8012): asking only about a named model let
+		// a restricted key draw on the host's own.
+		if isGroup && !groupGiven(r, keyWho, keyHeld, g, ms) || keyHeld && !isGroup && !modelAllowed(keyWho, p, model) {
 			fail(keyModelRefusal(w, keyWho, d.Model))
 			return
 		}

@@ -1632,6 +1632,11 @@ magpie.plugin("sessions", (ctx) => {
       if (on) stepFull.add(it.p); else stepFull.delete(it.p);
     };
     whole(stepFull.has(it.p));
+    // the part itself was cut at partMax (content.go:88): say how much is
+    // missing, in the words `magpie sessions show` uses, so a search that
+    // found a word past the cut is not left showing nothing (hdhfhf_hdh219
+    // on X, #8035). Appended under .cx-more, which a re-draw removes.
+    if (it.p.cut > 0) n.append(el("p", "cx-more", t("(cut: {n} more characters)", { n: it.p.cut })));
     n.tabIndex = 0;
     n.onclick = () => { if (!String(getSelection?.() || "")) whole(!n.classList.contains("full")); };
     n.onkeydown = (e) => {
